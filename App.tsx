@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Zap, Activity, AlertTriangle, Play, Pause, Lock, RefreshCw, TrendingUp, TrendingDown, Flame, DollarSign, BarChart3, Siren, Power, ScanEye, Settings, Key, X, CheckCircle2, Globe } from 'lucide-react';
+import { Zap, Activity, AlertTriangle, Play, Pause, Lock, RefreshCw, TrendingUp, TrendingDown, Flame, DollarSign, BarChart3, Siren, Power, ScanEye, Settings, Key, X, CheckCircle2, Globe, Timer } from 'lucide-react';
 import { Chart } from './components/Chart';
 import { Candle, TechnicalIndicators, PredictionResult, SignalType, Asset } from './types';
 import { analyzeMarket } from './services/indicators';
@@ -19,7 +19,7 @@ const ASSETS: Asset[] = [
   { symbol: 'avaxusdt', name: 'AVAX', category: 'Crypto', profit: 80, isHot: true, initialPrice: 34.33, isSimulated: false },
   { symbol: 'suiusdt', name: 'SUI', category: 'Crypto', profit: 80, isHot: true, initialPrice: 3.19, isSimulated: false },
   { symbol: 'linkusdt', name: 'LINK', category: 'Crypto', profit: 80, isHot: true, initialPrice: 20.74, isSimulated: false },
-  { symbol: 'xlmusdt', name: 'Stellar', category: 'Crypto', profit: 80, isHot: true, initialPrice: 0.28, isSimulated: false }, // Mapped Stellar to XLM
+  { symbol: 'xlmusdt', name: 'Stellar', category: 'Crypto', profit: 80, isHot: true, initialPrice: 0.28, isSimulated: false },
 
   // --- STOCKS (Simulated) ---
   { symbol: 'AAPL_S', name: 'Apple', category: 'Stocks', profit: 98, isHot: true, initialPrice: 237.92, isSimulated: true },
@@ -117,7 +117,6 @@ const App: React.FC = () => {
     saveApiKey(apiKey);
     setHasKey(true);
     setShowSettings(false);
-    // Trigger analysis immediately to test key
     if (indicators) handleAnalysis(indicators);
   };
 
@@ -130,8 +129,6 @@ const App: React.FC = () => {
   const handleBrokerSelect = (broker: typeof BROKERS[0]) => {
       setActiveBroker(broker);
       setShowBrokerModal(false);
-      // In a real app, this might switch API endpoints. 
-      // Here it switches the UI context to "Signal Mode" vs "API Mode".
   };
 
   // Timer for the candle window
@@ -145,29 +142,24 @@ const App: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Initialize Gemini
   useEffect(() => {
     initializeGemini();
   }, []);
 
-  // Data Stream Handler (WebSocket or Simulation)
+  // Data Stream Handler
   useEffect(() => {
-    // Cleanup previous connections
     if (wsRef.current) wsRef.current.close();
     if (simRef.current) clearInterval(simRef.current);
     
     setCandles([]); 
     setIsConnected(false);
-    // Reset prediction when changing assets
     setPrediction(null);
 
     if (selectedAsset.isSimulated) {
-      // --- SIMULATION MODE (For OTC, Stocks, Forex, etc.) ---
       setIsConnected(true);
       let simPrice = selectedAsset.initialPrice;
-      const volatility = simPrice * 0.0005; // 0.05% volatility per tick
+      const volatility = simPrice * 0.0005; 
 
-      // Generate initial history
       const initialCandles: Candle[] = [];
       let tempPrice = simPrice;
       const now = Date.now();
@@ -186,7 +178,6 @@ const App: React.FC = () => {
       setCurrentPrice(simPrice);
 
       simRef.current = setInterval(() => {
-        // Random Walk
         const change = (Math.random() - 0.5) * volatility;
         simPrice += change;
         setCurrentPrice(simPrice);
@@ -198,7 +189,6 @@ const App: React.FC = () => {
            const lastCandle = prev[prev.length - 1];
            
            if (lastCandle && lastCandle.time === currentMinute) {
-             // Update current candle
              const newCandles = [...prev];
              newCandles[newCandles.length - 1] = {
                ...lastCandle,
@@ -209,7 +199,6 @@ const App: React.FC = () => {
              };
              return newCandles;
            } else {
-             // New candle
              const newCandle: Candle = {
                time: currentMinute,
                open: simPrice,
@@ -221,10 +210,9 @@ const App: React.FC = () => {
              return [...prev, newCandle].slice(-50);
            }
         });
-      }, 1000); // Update every second
+      }, 1000);
 
     } else {
-      // --- BINANCE WEBSOCKET MODE (For Real Crypto) ---
       const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${selectedAsset.symbol}@kline_1m`);
 
       ws.onopen = () => {
@@ -270,35 +258,27 @@ const App: React.FC = () => {
     };
   }, [selectedAsset]);
 
-  // Handle Logic
   const handleAnalysis = useCallback(async (inds: TechnicalIndicators) => {
     if (candles.length === 0) return;
     setIsAnalyzing(true);
     const lastPrice = candles[candles.length - 1].close;
-    
-    // Pass current data to Gemini Service
     const result = await getGeminiPrediction(selectedAsset.name, lastPrice, inds);
     setPrediction(result);
     setIsAnalyzing(false);
   }, [candles, selectedAsset.name]);
 
-
-  // Analysis Loop
   useEffect(() => {
     if (candles.length < 20) return;
 
     const currentIndicators = analyzeMarket(candles);
     setIndicators(currentIndicators);
 
-    // OPTIMIZATION: Only analyze automatically once per minute at 12s mark
-    // This dramatically reduces API calls to avoid Quota Exceeded errors.
-    if (enableAI && timeLeft === 12) { 
+    // Auto-analyze near the 30s mark to give user time to react
+    if (enableAI && timeLeft === 30) { 
         handleAnalysis(currentIndicators); 
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candles.length, timeLeft, enableAI]); 
+  }, [candles.length, timeLeft, enableAI, handleAnalysis]); 
 
-  // Helper for UI colors
   const getSignalColor = (signal: SignalType) => {
     switch (signal) {
       case SignalType.BUY: return 'text-green-400 border-green-500 bg-green-500/10 shadow-[0_0_20px_rgba(74,222,128,0.2)]';
@@ -314,15 +294,41 @@ const App: React.FC = () => {
     return 'text-slate-400';
   };
 
-  // Filter assets
   const filteredAssets = ASSETS.filter(a => 
     a.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
     a.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const isHighProb = prediction && prediction.probability >= 90 && (prediction.signal === 'BUY' || prediction.signal === 'SELL');
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-cyan-500/30">
       
+      {/* --- HIGH PROBABILITY ALERT OVERLAY --- */}
+      {isHighProb && timeLeft < 40 && timeLeft > 5 && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-green-900/20 backdrop-blur-sm animate-pulse pointer-events-none">
+          <div className="bg-slate-900/90 border-2 border-green-500 p-8 rounded-3xl shadow-[0_0_50px_rgba(34,197,94,0.5)] flex flex-col items-center animate-bounce-slow">
+            <Siren className="w-16 h-16 text-green-400 mb-4 animate-spin-slow" />
+            <h1 className="text-4xl font-black text-white uppercase tracking-tighter mb-2">
+              OPPORTUNITY DETECTED
+            </h1>
+            <div className="flex items-center gap-4 mt-2">
+               <span className={`text-5xl font-bold ${prediction?.signal === 'BUY' ? 'text-green-400' : 'text-red-500'}`}>
+                 {prediction?.signal} NOW
+               </span>
+               <div className="h-12 w-[2px] bg-slate-600"></div>
+               <div className="flex flex-col items-center">
+                  <span className="text-sm text-slate-400 uppercase">Time Left</span>
+                  <span className="text-4xl font-mono font-bold text-white">{timeLeft}s</span>
+               </div>
+            </div>
+            <p className="mt-4 text-slate-300 font-medium bg-slate-800 px-4 py-2 rounded-lg">
+              {prediction?.rationale}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Settings Modal */}
       {showSettings && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -553,11 +559,11 @@ const App: React.FC = () => {
               <span className="text-xs text-slate-600">Trend Strength</span>
             </div>
             <div className="bg-slate-900 rounded-xl p-4 border border-slate-800">
-               <span className="text-xs text-slate-500 uppercase tracking-wider">Time Left</span>
-               <div className="text-2xl font-mono font-bold mt-1 text-cyan-400">
-                 {timeLeft}s
+               <span className="text-xs text-slate-500 uppercase tracking-wider">Entry Window</span>
+               <div className="text-2xl font-mono font-bold mt-1 text-cyan-400 flex items-center gap-2">
+                 <Timer className="w-5 h-5" /> {timeLeft}s
                </div>
-               <span className="text-xs text-slate-600">Candle Close</span>
+               <span className="text-xs text-slate-600">Until Next Candle</span>
             </div>
           </div>
           
@@ -566,11 +572,7 @@ const App: React.FC = () => {
              <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
              <p className="text-xs text-yellow-500/80">
                <strong>Active Mode: {activeBroker.name} ({activeBroker.type})</strong><br/>
-               The requested broker does not have a public API. 
-               {selectedAsset.isSimulated 
-                 ? ` For ${selectedAsset.name}, we are simulating realistic price movements based on the last known price to demonstrate the bot's predictive engine.`
-                 : ` For ${selectedAsset.name}, we are using live data directly from Binance.`
-               }
+               Using Binance WebSocket data as a proxy for price action. Prices on {activeBroker.name} may vary slightly due to spread or OTC manipulation.
              </p>
            </div>
         </div>
@@ -584,8 +586,8 @@ const App: React.FC = () => {
             
             <div className="flex justify-between items-start mb-6">
               <div>
-                <h2 className="text-lg font-semibold text-white">AI Analysis</h2>
-                <p className="text-xs text-slate-500">Powered by Gemini 2.5</p>
+                <h2 className="text-lg font-semibold text-white">AI Prediction</h2>
+                <p className="text-xs text-slate-500">Gemini 2.5 Flash • 1M TF</p>
               </div>
               <div className="flex gap-2">
                  {/* Auto-Scan Toggle */}
@@ -626,14 +628,14 @@ const App: React.FC = () => {
                   {prediction.probability > 90 && (
                      <div className="mt-4 flex items-center gap-2 text-green-400 animate-bounce">
                         <Siren className="w-5 h-5" />
-                        <span className="text-xs font-bold uppercase tracking-wider">Strong Signal Detected</span>
+                        <span className="text-xs font-bold uppercase tracking-wider">SNIPER SIGNAL</span>
                      </div>
                   )}
                 </>
               ) : (
                 <div className="text-slate-500 flex flex-col items-center animate-pulse">
                    <RefreshCw className="w-8 h-8 mb-2 animate-spin" />
-                   <span>Analyzing Market Structure...</span>
+                   <span>Scanning Market...</span>
                 </div>
               )}
             </div>
@@ -650,9 +652,9 @@ const App: React.FC = () => {
           {/* Manual Trade Actions */}
           <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800">
              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Operations</h3>
+                <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Manual Entry</h3>
                 <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded border border-green-500/30">
-                  Potential Profit: +{selectedAsset.profit}%
+                  Target: {selectedAsset.name}
                 </span>
              </div>
              
@@ -662,14 +664,14 @@ const App: React.FC = () => {
                   className="bg-green-600 hover:bg-green-500 active:scale-95 transition-all py-4 rounded-xl flex flex-col items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed group"
                 >
                   <TrendingUp className="w-6 h-6 text-white mb-1 group-hover:-translate-y-1 transition-transform" />
-                  <span className="font-bold text-white">CALL</span>
+                  <span className="font-bold text-white">CALL (UP)</span>
                 </button>
                 <button 
                   disabled={!prediction}
                   className="bg-red-600 hover:bg-red-500 active:scale-95 transition-all py-4 rounded-xl flex flex-col items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed group"
                 >
                   <TrendingDown className="w-6 h-6 text-white mb-1 group-hover:translate-y-1 transition-transform" />
-                  <span className="font-bold text-white">PUT</span>
+                  <span className="font-bold text-white">PUT (DOWN)</span>
                 </button>
              </div>
 
@@ -678,7 +680,7 @@ const App: React.FC = () => {
                  <div className={`w-10 h-6 rounded-full p-1 cursor-pointer transition-colors ${autoTrade ? 'bg-cyan-500' : 'bg-slate-600'}`} onClick={() => setAutoTrade(!autoTrade)}>
                    <div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform ${autoTrade ? 'translate-x-4' : ''}`}></div>
                  </div>
-                 <span className="text-sm font-medium text-slate-300">Auto-Trade Bot</span>
+                 <span className="text-sm font-medium text-slate-300">Copy Trading Bot</span>
                </div>
                {autoTrade ? <Play className="w-4 h-4 text-cyan-400" /> : <Pause className="w-4 h-4 text-slate-500" />}
              </div>
