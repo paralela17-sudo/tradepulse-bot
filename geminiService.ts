@@ -50,35 +50,36 @@ const calculateLocalPrediction = (indicators: TechnicalIndicators, errorContext?
     let prob = 50;
     let rationale = "Market in consolidation. Awaiting clear breakout.";
 
-    // Strict Mathematical Strategy
-    if (rsi < 25 && macd.histogram > 0) {
+    // Strict Mathematical Strategy for Binary Options (Short term reversal/continuation)
+    if (rsi < 20 && macd.histogram > 0) {
       signal = SignalType.BUY;
-      prob = 92; 
-      rationale = "Strong Reversal: Deep oversold (RSI < 25) + Momentum shift.";
-    } else if (rsi > 75 && macd.histogram < 0) {
+      prob = 93; 
+      rationale = "SNIPER ENTRY: Extreme oversold (RSI < 20) + Momentum flip.";
+    } else if (rsi > 80 && macd.histogram < 0) {
       signal = SignalType.SELL;
       prob = 94; 
-      rationale = "Strong Reversal: Extreme overbought (RSI > 75) + Bearish divergence.";
+      rationale = "SNIPER ENTRY: Extreme overbought (RSI > 80) + Bearish divergence.";
     } 
-    else if (rsi > 50 && rsi < 70 && macd.histogram > 0 && macd.macdLine > macd.signalLine) {
+    else if (rsi > 55 && rsi < 70 && macd.histogram > 0.00005 && macd.macdLine > macd.signalLine) {
        signal = SignalType.BUY;
-       prob = 78;
-       rationale = "Trend Continuation: Bullish momentum confirming uptrend.";
+       prob = 82;
+       rationale = "Trend Continuation: Strong Bullish momentum confirmed.";
     }
-    else if (rsi < 50 && rsi > 30 && macd.histogram < 0 && macd.macdLine < macd.signalLine) {
+    else if (rsi < 45 && rsi > 30 && macd.histogram < -0.00005 && macd.macdLine < macd.signalLine) {
        signal = SignalType.SELL;
-       prob = 78;
-       rationale = "Trend Continuation: Bearish momentum confirming downtrend.";
+       prob = 82;
+       rationale = "Trend Continuation: Strong Bearish momentum confirmed.";
     }
-    else if (Math.abs(macd.histogram) < 0.0001) {
+    else if (Math.abs(macd.histogram) < 0.00001) {
       signal = SignalType.WAIT;
-      prob = 45;
-      rationale = "Low volatility detected. No clear direction.";
+      prob = 30;
+      rationale = "DEAD ZONE: No volatility. Do not trade.";
     }
 
-    prob = Math.min(99, Math.max(10, prob + (Math.random() * 4 - 2)));
+    // Add slight noise to simulate market flux
+    prob = Math.min(99, Math.max(10, prob + (Math.random() * 2 - 1)));
     
-    const prefix = errorContext ? `[${errorContext}] ` : "[LOCAL MATH] ";
+    const prefix = errorContext ? `[${errorContext}] ` : "[MATH CORE] ";
 
     return {
       probability: Math.floor(prob),
@@ -102,37 +103,35 @@ export const getGeminiPrediction = async (
 
   try {
     const prompt = `
-      You are TradePulse, an elite High-Frequency Trading (HFT) AI. 
-      Analyze the current market state for ${symbol} to predict the CLOSE of the next 1-minute candle.
+      Act as a world-class Binary Options Analyst. 
+      Analyze the immediate 1-minute candle direction for ${symbol}.
+      Current Price: ${price}
+      
+      Indicators:
+      - RSI (14): ${indicators.rsi.toFixed(2)}
+      - MACD Histogram: ${indicators.macd.histogram.toFixed(6)}
+      - SMA (20): ${indicators.sma.toFixed(2)}
 
-      Market Telemetry:
-      - Asset: ${symbol}
-      - Current Price: ${price}
-      - RSI (14): ${indicators.rsi.toFixed(2)} (Overbought > 70, Oversold < 30)
-      - MACD Histogram: ${indicators.macd.histogram.toFixed(6)} (Positive = Bullish, Negative = Bearish)
-      - SMA (20): ${indicators.sma.toFixed(2)} (Price > SMA = Uptrend)
-
-      Analysis Rules:
-      1. CRITICAL: Identify probability of reversal vs continuation.
-      2. If RSI is extreme (<25 or >75) AND MACD supports reversal, assign probability > 90%.
-      3. If trends align (Price > SMA + RSI Rising + MACD Green), signal BUY.
-      4. Be conservative. Only predict > 80% if multiple indicators align perfectly.
-
-      Output required in JSON format.
+      STRICT RULES FOR 90%+ PROBABILITY:
+      1. ONLY return probability > 90 if RSI is extreme (<25 or >75) AND MACD confirms reversal.
+      2. If the market is ranging (RSI 40-60), return probability < 60 and Signal WAIT.
+      3. Focus on "Sniper Entries" - the exact moment of reversal.
+      
+      Output JSON only.
     `;
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
-        systemInstruction: "You are a specialized financial prediction engine. Your output must be precise, decisive, and strictly formatted.",
+        systemInstruction: "You are a ruthlessly accurate trading bot. Do not hallucinate trends. If uncertain, signal WAIT.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            probability: { type: Type.NUMBER, description: "Win probability percentage (0-100)" },
-            signal: { type: Type.STRING, enum: ["BUY", "SELL", "NEUTRAL", "WAIT"], description: "Recommended action" },
-            rationale: { type: Type.STRING, description: "Technical justification (max 15 words)" }
+            probability: { type: Type.NUMBER, description: "Win probability (0-100)" },
+            signal: { type: Type.STRING, enum: ["BUY", "SELL", "NEUTRAL", "WAIT"], description: "Action" },
+            rationale: { type: Type.STRING, description: "Short, punchy reason." }
           }
         }
       }
@@ -143,7 +142,7 @@ export const getGeminiPrediction = async (
     return {
       probability: json.probability || 50,
       signal: (json.signal as SignalType) || SignalType.NEUTRAL,
-      rationale: json.rationale || "Market analyzing...",
+      rationale: json.rationale || "Analyzing...",
       timestamp: Date.now()
     };
 
@@ -153,7 +152,6 @@ export const getGeminiPrediction = async (
     let errorType = "API ERROR";
     const errorString = error.toString().toLowerCase();
     
-    // If invalid key, fallback to local math but maybe hint to check settings
     if (errorString.includes("api_key") || errorString.includes("permission")) {
         errorType = "INVALID KEY";
     }
@@ -164,3 +162,9 @@ export const getGeminiPrediction = async (
     return calculateLocalPrediction(indicators, errorType);
   }
 };
+
+
+
+
+
+ 
