@@ -1,0 +1,4 @@
+{
+  "name": "TradePulse AI - Predictive Analyst",
+  "description": "A real-time trading dashboard that analyzes crypto assets using Binance WebSockets and Google Gemini to predict market movements with probability scoring."
+}
