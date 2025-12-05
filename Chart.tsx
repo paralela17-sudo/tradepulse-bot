@@ -1,6 +1,6 @@
 import React from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Candle } from '../types';
+import { Candle } from './types';
 
 interface ChartProps {
   data: Candle[];
@@ -23,34 +23,34 @@ export const Chart: React.FC<ChartProps> = ({ data, color }) => {
         <AreaChart data={chartData}>
           <defs>
             <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={color} stopOpacity={0.3}/>
-              <stop offset="95%" stopColor={color} stopOpacity={0}/>
+              <stop offset="5%" stopColor={color} stopOpacity={0.3} />
+              <stop offset="95%" stopColor={color} stopOpacity={0} />
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-          <XAxis 
-            dataKey="time" 
-            stroke="#94a3b8" 
-            tick={{fontSize: 10}} 
+          <XAxis
+            dataKey="time"
+            stroke="#94a3b8"
+            tick={{ fontSize: 10 }}
             tickMargin={10}
             interval="preserveStartEnd"
           />
-          <YAxis 
-            stroke="#94a3b8" 
-            domain={[minPrice - padding, maxPrice + padding]} 
-            tick={{fontSize: 10}}
+          <YAxis
+            stroke="#94a3b8"
+            domain={[minPrice - padding, maxPrice + padding]}
+            tick={{ fontSize: 10 }}
             width={60}
           />
-          <Tooltip 
-            contentStyle={{backgroundColor: '#1e293b', borderColor: '#475569', color: '#f8fafc'}}
-            itemStyle={{color: color}}
+          <Tooltip
+            contentStyle={{ backgroundColor: '#1e293b', borderColor: '#475569', color: '#f8fafc' }}
+            itemStyle={{ color: color }}
           />
-          <Area 
-            type="monotone" 
-            dataKey="price" 
-            stroke={color} 
-            fillOpacity={1} 
-            fill="url(#colorPrice)" 
+          <Area
+            type="monotone"
+            dataKey="price"
+            stroke={color}
+            fillOpacity={1}
+            fill="url(#colorPrice)"
             isAnimationActive={false}
           />
         </AreaChart>

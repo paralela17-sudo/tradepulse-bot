@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Zap, Activity, AlertTriangle, Play, Pause, Lock, RefreshCw, TrendingUp, TrendingDown, Flame, DollarSign, BarChart3, Siren, Power, ScanEye, Settings, Key, X, CheckCircle2, Globe, Timer } from 'lucide-react';
-import { Chart } from './components/Chart';
+import { Activity, AlertTriangle, Play, Pause, Lock, RefreshCw, TrendingUp, TrendingDown, Flame, BarChart3, Siren, Power, ScanEye, Settings, Key, X, CheckCircle2, Globe, Timer } from 'lucide-react';
+import { Chart } from './Chart';
 import { Candle, TechnicalIndicators, PredictionResult, SignalType, Asset } from './types';
-import { analyzeMarket } from './services/indicators';
-import { getGeminiPrediction, initializeGemini, saveApiKey, getStoredApiKey, removeApiKey } from './services/geminiService';
+import { analyzeMarket } from './indicators';
+import { getGeminiPrediction, initializeGemini, saveApiKey, getStoredApiKey, removeApiKey } from './geminiService';
 
 // Full Asset List based on user request
 const ASSETS: Asset[] = [
@@ -57,7 +57,7 @@ const ASSETS: Asset[] = [
   { symbol: 'TSLA_OTC', name: 'Tesla (OTC)', category: 'OTC', profit: 92, isHot: true, initialPrice: 402.41, isSimulated: true },
   { symbol: 'MSFT_OTC', name: 'Microsoft (OTC)', category: 'OTC', profit: 92, isHot: true, initialPrice: 530.01, isSimulated: true },
   { symbol: 'EURJPY_OTC', name: 'EUR/JPY (OTC)', category: 'OTC', profit: 92, isHot: true, initialPrice: 165.86, isSimulated: true },
-  
+
   // --- FOREX (Simulated) ---
   { symbol: 'EURUSD_F', name: 'EUR/USD', category: 'Forex', profit: 86, isHot: true, initialPrice: 1.1730, isSimulated: true },
   { symbol: 'EURGBP_F', name: 'EUR/GBP', category: 'Forex', profit: 86, isHot: true, initialPrice: 0.8710, isSimulated: true },
@@ -87,7 +87,7 @@ const App: React.FC = () => {
   const [indicators, setIndicators] = useState<TechnicalIndicators | null>(null);
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  
+
   // State for automation controls
   const [autoTrade, setAutoTrade] = useState(false);
   const [enableAI, setEnableAI] = useState(true);
@@ -100,16 +100,16 @@ const App: React.FC = () => {
 
   const [timeLeft, setTimeLeft] = useState<number>(60);
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   const wsRef = useRef<WebSocket | null>(null);
   const simRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  
+
   // Check for API Key on mount
   useEffect(() => {
     const key = getStoredApiKey();
     if (key) {
-        setHasKey(true);
-        setApiKey(key);
+      setHasKey(true);
+      setApiKey(key);
     }
   }, []);
 
@@ -121,14 +121,14 @@ const App: React.FC = () => {
   };
 
   const handleRemoveKey = () => {
-      removeApiKey();
-      setHasKey(false);
-      setApiKey("");
+    removeApiKey();
+    setHasKey(false);
+    setApiKey("");
   };
 
   const handleBrokerSelect = (broker: typeof BROKERS[0]) => {
-      setActiveBroker(broker);
-      setShowBrokerModal(false);
+    setActiveBroker(broker);
+    setShowBrokerModal(false);
   };
 
   // Timer for the candle window
@@ -150,29 +150,29 @@ const App: React.FC = () => {
   useEffect(() => {
     if (wsRef.current) wsRef.current.close();
     if (simRef.current) clearInterval(simRef.current);
-    
-    setCandles([]); 
+
+    setCandles([]);
     setIsConnected(false);
     setPrediction(null);
 
     if (selectedAsset.isSimulated) {
       setIsConnected(true);
       let simPrice = selectedAsset.initialPrice;
-      const volatility = simPrice * 0.0005; 
+      const volatility = simPrice * 0.0005;
 
       const initialCandles: Candle[] = [];
       let tempPrice = simPrice;
       const now = Date.now();
-      for(let i=50; i>0; i--) {
-         tempPrice = tempPrice + (Math.random() - 0.5) * volatility * 5;
-         initialCandles.push({
-           time: now - (i * 60000),
-           open: tempPrice,
-           high: tempPrice * 1.001,
-           low: tempPrice * 0.999,
-           close: tempPrice,
-           volume: Math.random() * 1000
-         });
+      for (let i = 50; i > 0; i--) {
+        tempPrice = tempPrice + (Math.random() - 0.5) * volatility * 5;
+        initialCandles.push({
+          time: now - (i * 60000),
+          open: tempPrice,
+          high: tempPrice * 1.001,
+          low: tempPrice * 0.999,
+          close: tempPrice,
+          volume: Math.random() * 1000
+        });
       }
       setCandles(initialCandles);
       setCurrentPrice(simPrice);
@@ -186,29 +186,29 @@ const App: React.FC = () => {
         const currentMinute = Math.floor(currentTimestamp / 60000) * 60000;
 
         setCandles(prev => {
-           const lastCandle = prev[prev.length - 1];
-           
-           if (lastCandle && lastCandle.time === currentMinute) {
-             const newCandles = [...prev];
-             newCandles[newCandles.length - 1] = {
-               ...lastCandle,
-               close: simPrice,
-               high: Math.max(lastCandle.high, simPrice),
-               low: Math.min(lastCandle.low, simPrice),
-               volume: lastCandle.volume + Math.random() * 10
-             };
-             return newCandles;
-           } else {
-             const newCandle: Candle = {
-               time: currentMinute,
-               open: simPrice,
-               high: simPrice,
-               low: simPrice,
-               close: simPrice,
-               volume: 0
-             };
-             return [...prev, newCandle].slice(-50);
-           }
+          const lastCandle = prev[prev.length - 1];
+
+          if (lastCandle && lastCandle.time === currentMinute) {
+            const newCandles = [...prev];
+            newCandles[newCandles.length - 1] = {
+              ...lastCandle,
+              close: simPrice,
+              high: Math.max(lastCandle.high, simPrice),
+              low: Math.min(lastCandle.low, simPrice),
+              volume: lastCandle.volume + Math.random() * 10
+            };
+            return newCandles;
+          } else {
+            const newCandle: Candle = {
+              time: currentMinute,
+              open: simPrice,
+              high: simPrice,
+              low: simPrice,
+              close: simPrice,
+              volume: 0
+            };
+            return [...prev, newCandle].slice(-50);
+          }
         });
       }, 1000);
 
@@ -231,7 +231,7 @@ const App: React.FC = () => {
             close: parseFloat(k.c),
             volume: parseFloat(k.v),
           };
-          
+
           setCurrentPrice(candle.close);
 
           setCandles(prev => {
@@ -274,10 +274,10 @@ const App: React.FC = () => {
     setIndicators(currentIndicators);
 
     // Auto-analyze near the 30s mark to give user time to react
-    if (enableAI && timeLeft === 30) { 
-        handleAnalysis(currentIndicators); 
+    if (enableAI && timeLeft === 30) {
+      handleAnalysis(currentIndicators);
     }
-  }, [candles.length, timeLeft, enableAI, handleAnalysis]); 
+  }, [candles.length, timeLeft, enableAI, handleAnalysis]);
 
   const getSignalColor = (signal: SignalType) => {
     switch (signal) {
@@ -294,8 +294,8 @@ const App: React.FC = () => {
     return 'text-slate-400';
   };
 
-  const filteredAssets = ASSETS.filter(a => 
-    a.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+  const filteredAssets = ASSETS.filter(a =>
+    a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     a.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -303,7 +303,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-cyan-500/30">
-      
+
       {/* --- HIGH PROBABILITY ALERT OVERLAY --- */}
       {isHighProb && timeLeft < 40 && timeLeft > 5 && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-green-900/20 backdrop-blur-sm animate-pulse pointer-events-none">
@@ -313,14 +313,14 @@ const App: React.FC = () => {
               OPPORTUNITY DETECTED
             </h1>
             <div className="flex items-center gap-4 mt-2">
-               <span className={`text-5xl font-bold ${prediction?.signal === 'BUY' ? 'text-green-400' : 'text-red-500'}`}>
-                 {prediction?.signal} NOW
-               </span>
-               <div className="h-12 w-[2px] bg-slate-600"></div>
-               <div className="flex flex-col items-center">
-                  <span className="text-sm text-slate-400 uppercase">Time Left</span>
-                  <span className="text-4xl font-mono font-bold text-white">{timeLeft}s</span>
-               </div>
+              <span className={`text-5xl font-bold ${prediction?.signal === 'BUY' ? 'text-green-400' : 'text-red-500'}`}>
+                {prediction?.signal} NOW
+              </span>
+              <div className="h-12 w-[2px] bg-slate-600"></div>
+              <div className="flex flex-col items-center">
+                <span className="text-sm text-slate-400 uppercase">Time Left</span>
+                <span className="text-4xl font-mono font-bold text-white">{timeLeft}s</span>
+              </div>
             </div>
             <p className="mt-4 text-slate-300 font-medium bg-slate-800 px-4 py-2 rounded-lg">
               {prediction?.rationale}
@@ -333,48 +333,48 @@ const App: React.FC = () => {
       {showSettings && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl">
-             <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                   <Settings className="w-6 h-6 text-cyan-400" /> Settings
-                </h3>
-                <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-white">
-                   <X className="w-6 h-6" />
-                </button>
-             </div>
-             
-             <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-400 mb-2">Gemini API Key</label>
-                <div className="relative">
-                   <Key className="absolute left-3 top-3 w-5 h-5 text-slate-500" />
-                   <input 
-                      type="password" 
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      placeholder="Enter your Google Gemini API Key"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-cyan-500 transition-colors"
-                   />
-                </div>
-                <p className="text-xs text-slate-500 mt-2">
-                   Your key is stored locally in your browser. It is never sent to our servers.
-                </p>
-             </div>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <Settings className="w-6 h-6 text-cyan-400" /> Settings
+              </h3>
+              <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-white">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
 
-             <div className="flex gap-3">
-               {hasKey && (
-                 <button 
-                   onClick={handleRemoveKey}
-                   className="flex-1 bg-red-500/10 text-red-400 hover:bg-red-500/20 py-3 rounded-xl font-medium transition-colors"
-                 >
-                   Clear Key
-                 </button>
-               )}
-               <button 
-                 onClick={handleSaveKey}
-                 className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white py-3 rounded-xl font-bold transition-colors"
-               >
-                 Save & Connect
-               </button>
-             </div>
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-slate-400 mb-2">Gemini API Key</label>
+              <div className="relative">
+                <Key className="absolute left-3 top-3 w-5 h-5 text-slate-500" />
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="Enter your Google Gemini API Key"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-cyan-500 transition-colors"
+                />
+              </div>
+              <p className="text-xs text-slate-500 mt-2">
+                Your key is stored locally in your browser. It is never sent to our servers.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              {hasKey && (
+                <button
+                  onClick={handleRemoveKey}
+                  className="flex-1 bg-red-500/10 text-red-400 hover:bg-red-500/20 py-3 rounded-xl font-medium transition-colors"
+                >
+                  Clear Key
+                </button>
+              )}
+              <button
+                onClick={handleSaveKey}
+                className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white py-3 rounded-xl font-bold transition-colors"
+              >
+                Save & Connect
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -383,49 +383,48 @@ const App: React.FC = () => {
       {showBrokerModal && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full shadow-2xl">
-             <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                   <Globe className="w-6 h-6 text-cyan-400" /> Select Target Broker
-                </h3>
-                <button onClick={() => setShowBrokerModal(false)} className="text-slate-400 hover:text-white">
-                   <X className="w-6 h-6" />
-                </button>
-             </div>
-             
-             <p className="text-sm text-slate-400 mb-6">
-                Select the broker you are manually trading on. TradePulse will analyze market data (via Binance/OTC) and generate signals optimized for your platform's timeframe.
-             </p>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <Globe className="w-6 h-6 text-cyan-400" /> Select Target Broker
+              </h3>
+              <button onClick={() => setShowBrokerModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
 
-             <div className="space-y-3">
-                {BROKERS.map(broker => (
-                  <button
-                    key={broker.id}
-                    onClick={() => handleBrokerSelect(broker)}
-                    className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${
-                        activeBroker.id === broker.id 
-                        ? 'bg-cyan-500/10 border-cyan-500' 
-                        : 'bg-slate-950 border-slate-800 hover:bg-slate-800 hover:border-slate-700'
+            <p className="text-sm text-slate-400 mb-6">
+              Select the broker you are manually trading on. TradePulse will analyze market data (via Binance/OTC) and generate signals optimized for your platform's timeframe.
+            </p>
+
+            <div className="space-y-3">
+              {BROKERS.map(broker => (
+                <button
+                  key={broker.id}
+                  onClick={() => handleBrokerSelect(broker)}
+                  className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${activeBroker.id === broker.id
+                    ? 'bg-cyan-500/10 border-cyan-500'
+                    : 'bg-slate-950 border-slate-800 hover:bg-slate-800 hover:border-slate-700'
                     }`}
-                  >
-                     <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-slate-900 font-bold ${broker.color}`}>
-                           {broker.name.substring(0, 2)}
-                        </div>
-                        <div className="text-left">
-                           <div className={`font-bold ${activeBroker.id === broker.id ? 'text-white' : 'text-slate-300'}`}>
-                              {broker.name}
-                           </div>
-                           <div className="text-xs text-slate-500 uppercase tracking-wide">
-                              {broker.type}
-                           </div>
-                        </div>
-                     </div>
-                     {activeBroker.id === broker.id && (
-                        <CheckCircle2 className="w-6 h-6 text-cyan-500" />
-                     )}
-                  </button>
-                ))}
-             </div>
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-slate-900 font-bold ${broker.color}`}>
+                      {broker.name.substring(0, 2)}
+                    </div>
+                    <div className="text-left">
+                      <div className={`font-bold ${activeBroker.id === broker.id ? 'text-white' : 'text-slate-300'}`}>
+                        {broker.name}
+                      </div>
+                      <div className="text-xs text-slate-500 uppercase tracking-wide">
+                        {broker.type}
+                      </div>
+                    </div>
+                  </div>
+                  {activeBroker.id === broker.id && (
+                    <CheckCircle2 className="w-6 h-6 text-cyan-500" />
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -447,92 +446,91 @@ const App: React.FC = () => {
               </p>
             </div>
           </div>
-          
-          <div className="flex items-center gap-4">
-             <div className="hidden md:flex flex-col items-end mr-4">
-                <span className="text-xs text-slate-400">Target Broker</span>
-                <span className={`text-sm font-bold ${activeBroker.color}`}>{activeBroker.name}</span>
-             </div>
-             
-             {/* Settings Button */}
-             <button 
-               onClick={() => setShowSettings(true)}
-               className={`p-2 rounded-lg transition-colors border ${hasKey ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white' : 'bg-yellow-500/10 border-yellow-500/50 text-yellow-500 animate-pulse'}`}
-             >
-                <Settings className="w-5 h-5" />
-             </button>
 
-             <button 
-                onClick={() => setShowBrokerModal(true)}
-                className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-             >
-                <Lock className="w-4 h-4" /> Connect Broker
-             </button>
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex flex-col items-end mr-4">
+              <span className="text-xs text-slate-400">Target Broker</span>
+              <span className={`text-sm font-bold ${activeBroker.color}`}>{activeBroker.name}</span>
+            </div>
+
+            {/* Settings Button */}
+            <button
+              onClick={() => setShowSettings(true)}
+              className={`p-2 rounded-lg transition-colors border ${hasKey ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white' : 'bg-yellow-500/10 border-yellow-500/50 text-yellow-500 animate-pulse'}`}
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+
+            <button
+              onClick={() => setShowBrokerModal(true)}
+              className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+            >
+              <Lock className="w-4 h-4" /> Connect Broker
+            </button>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         {/* Left Column: Chart & Controls */}
         <div className="lg:col-span-2 space-y-6">
-          
+
           {/* Asset Selector */}
           <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
             <div className="flex items-center justify-between mb-3">
-               <h3 className="text-sm font-medium text-slate-400 flex items-center gap-2">
-                 <BarChart3 className="w-4 h-4" /> Market Selector
-               </h3>
-               <input 
-                  type="text" 
-                  placeholder="Search asset..." 
-                  className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1 text-xs focus:outline-none focus:border-cyan-500"
-                  onChange={(e) => setSearchQuery(e.target.value)}
-               />
+              <h3 className="text-sm font-medium text-slate-400 flex items-center gap-2">
+                <BarChart3 className="w-4 h-4" /> Market Selector
+              </h3>
+              <input
+                type="text"
+                placeholder="Search asset..."
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1 text-xs focus:outline-none focus:border-cyan-500"
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
-            
+
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-               {['Crypto', 'OTC', 'Stocks', 'Forex', 'Commodities'].map(cat => (
-                 <div key={cat} className="flex-shrink-0">
-                    <span className="text-xs font-bold text-slate-500 uppercase px-2 mb-1 block">{cat}</span>
-                    <div className="flex gap-2">
-                      {filteredAssets.filter(a => a.category === cat).map(asset => (
-                        <button
-                          key={asset.symbol}
-                          onClick={() => setSelectedAsset(asset)}
-                          className={`flex flex-col min-w-[100px] p-2 rounded-lg border transition-all ${
-                            selectedAsset.symbol === asset.symbol 
-                              ? 'bg-cyan-500/10 border-cyan-500/50' 
-                              : 'bg-slate-800 border-slate-700 hover:border-slate-600'
+              {['Crypto', 'OTC', 'Stocks', 'Forex', 'Commodities'].map(cat => (
+                <div key={cat} className="flex-shrink-0">
+                  <span className="text-xs font-bold text-slate-500 uppercase px-2 mb-1 block">{cat}</span>
+                  <div className="flex gap-2">
+                    {filteredAssets.filter(a => a.category === cat).map(asset => (
+                      <button
+                        key={asset.symbol}
+                        onClick={() => setSelectedAsset(asset)}
+                        className={`flex flex-col min-w-[100px] p-2 rounded-lg border transition-all ${selectedAsset.symbol === asset.symbol
+                          ? 'bg-cyan-500/10 border-cyan-500/50'
+                          : 'bg-slate-800 border-slate-700 hover:border-slate-600'
                           }`}
-                        >
-                          <div className="flex justify-between items-center w-full mb-1">
-                            <span className={`text-xs font-bold ${selectedAsset.symbol === asset.symbol ? 'text-cyan-400' : 'text-slate-300'}`}>
-                              {asset.name}
-                            </span>
-                            {asset.isHot && <Flame className="w-3 h-3 text-orange-500 fill-orange-500 animate-pulse" />}
-                          </div>
-                          <div className="flex justify-between items-center w-full">
-                            <span className="text-[10px] text-slate-500">{asset.category}</span>
-                            <span className="text-[10px] font-bold text-green-400">{asset.profit}%</span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                 </div>
-               ))}
+                      >
+                        <div className="flex justify-between items-center w-full mb-1">
+                          <span className={`text-xs font-bold ${selectedAsset.symbol === asset.symbol ? 'text-cyan-400' : 'text-slate-300'}`}>
+                            {asset.name}
+                          </span>
+                          {asset.isHot && <Flame className="w-3 h-3 text-orange-500 fill-orange-500 animate-pulse" />}
+                        </div>
+                        <div className="flex justify-between items-center w-full">
+                          <span className="text-[10px] text-slate-500">{asset.category}</span>
+                          <span className="text-[10px] font-bold text-green-400">{asset.profit}%</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
           {/* Main Chart */}
           <div className="relative group">
             <div className="absolute top-4 left-4 z-10 bg-slate-900/80 backdrop-blur px-3 py-1 rounded-lg border border-slate-700">
-               <span className="text-3xl font-bold text-white tracking-tight mr-2">
-                 ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
-               </span>
-               <span className="text-xs text-green-400 font-mono">
-                 Payout: {selectedAsset.profit}%
-               </span>
+              <span className="text-3xl font-bold text-white tracking-tight mr-2">
+                ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+              </span>
+              <span className="text-xs text-green-400 font-mono">
+                Payout: {selectedAsset.profit}%
+              </span>
             </div>
             <Chart data={candles} color={currentPrice > (candles[0]?.close || 0) ? '#10b981' : '#ef4444'} />
           </div>
@@ -545,9 +543,9 @@ const App: React.FC = () => {
                 {indicators?.rsi.toFixed(2) || '--'}
               </div>
               <div className="h-1.5 w-full bg-slate-800 rounded-full mt-2 overflow-hidden">
-                <div 
-                  className={`h-full ${indicators?.rsi && indicators.rsi > 70 ? 'bg-red-500' : indicators?.rsi && indicators.rsi < 30 ? 'bg-green-500' : 'bg-blue-500'}`} 
-                  style={{width: `${indicators?.rsi || 0}%`}}
+                <div
+                  className={`h-full ${indicators?.rsi && indicators.rsi > 70 ? 'bg-red-500' : indicators?.rsi && indicators.rsi < 30 ? 'bg-green-500' : 'bg-blue-500'}`}
+                  style={{ width: `${indicators?.rsi || 0}%` }}
                 ></div>
               </div>
             </div>
@@ -559,54 +557,54 @@ const App: React.FC = () => {
               <span className="text-xs text-slate-600">Trend Strength</span>
             </div>
             <div className="bg-slate-900 rounded-xl p-4 border border-slate-800">
-               <span className="text-xs text-slate-500 uppercase tracking-wider">Entry Window</span>
-               <div className="text-2xl font-mono font-bold mt-1 text-cyan-400 flex items-center gap-2">
-                 <Timer className="w-5 h-5" /> {timeLeft}s
-               </div>
-               <span className="text-xs text-slate-600">Until Next Candle</span>
+              <span className="text-xs text-slate-500 uppercase tracking-wider">Entry Window</span>
+              <div className="text-2xl font-mono font-bold mt-1 text-cyan-400 flex items-center gap-2">
+                <Timer className="w-5 h-5" /> {timeLeft}s
+              </div>
+              <span className="text-xs text-slate-600">Until Next Candle</span>
             </div>
           </div>
-          
-           {/* Disclaimer */}
-           <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-lg p-3 flex items-start gap-3">
-             <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
-             <p className="text-xs text-yellow-500/80">
-               <strong>Active Mode: {activeBroker.name} ({activeBroker.type})</strong><br/>
-               Using Binance WebSocket data as a proxy for price action. Prices on {activeBroker.name} may vary slightly due to spread or OTC manipulation.
-             </p>
-           </div>
+
+          {/* Disclaimer */}
+          <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-lg p-3 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-yellow-500/80">
+              <strong>Active Mode: {activeBroker.name} ({activeBroker.type})</strong><br />
+              Using Binance WebSocket data as a proxy for price action. Prices on {activeBroker.name} may vary slightly due to spread or OTC manipulation.
+            </p>
+          </div>
         </div>
 
         {/* Right Column: AI Predictions & Actions */}
         <div className="space-y-6">
-          
+
           {/* Signal Card */}
           <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 shadow-xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl -mr-10 -mt-10"></div>
-            
+
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h2 className="text-lg font-semibold text-white">AI Prediction</h2>
                 <p className="text-xs text-slate-500">Gemini 2.5 Flash • 1M TF</p>
               </div>
               <div className="flex gap-2">
-                 {/* Auto-Scan Toggle */}
-                 <button 
-                   onClick={() => setEnableAI(!enableAI)}
-                   className={`p-2 rounded-lg transition-colors ${enableAI ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-800 text-slate-600'}`}
-                   title={enableAI ? "Disable Auto-Scan (Save Quota)" : "Enable Auto-Scan"}
-                 >
-                    <Power className="w-5 h-5" />
-                 </button>
-                 {/* Manual Scan */}
-                 <button 
-                   onClick={() => indicators && handleAnalysis(indicators)}
-                   disabled={isAnalyzing}
-                   className="bg-slate-800 p-2 rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50"
-                   title="Scan Now"
-                 >
-                    <ScanEye className={`w-5 h-5 text-yellow-400 ${isAnalyzing ? 'animate-spin' : ''}`} />
-                 </button>
+                {/* Auto-Scan Toggle */}
+                <button
+                  onClick={() => setEnableAI(!enableAI)}
+                  className={`p-2 rounded-lg transition-colors ${enableAI ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-800 text-slate-600'}`}
+                  title={enableAI ? "Disable Auto-Scan (Save Quota)" : "Enable Auto-Scan"}
+                >
+                  <Power className="w-5 h-5" />
+                </button>
+                {/* Manual Scan */}
+                <button
+                  onClick={() => indicators && handleAnalysis(indicators)}
+                  disabled={isAnalyzing}
+                  className="bg-slate-800 p-2 rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50"
+                  title="Scan Now"
+                >
+                  <ScanEye className={`w-5 h-5 text-yellow-400 ${isAnalyzing ? 'animate-spin' : ''}`} />
+                </button>
               </div>
             </div>
 
@@ -617,7 +615,7 @@ const App: React.FC = () => {
                     {prediction.probability}%
                   </div>
                   <span className="text-sm text-slate-400 uppercase tracking-widest font-medium">Win Probability</span>
-                  
+
                   <div className={`mt-6 px-6 py-2 rounded-full border-2 font-bold text-xl flex items-center gap-2 transition-all duration-300 ${getSignalColor(prediction.signal)}`}>
                     {prediction.signal === SignalType.BUY && <TrendingUp className="w-5 h-5" />}
                     {prediction.signal === SignalType.SELL && <TrendingDown className="w-5 h-5" />}
@@ -626,16 +624,16 @@ const App: React.FC = () => {
                   </div>
 
                   {prediction.probability > 90 && (
-                     <div className="mt-4 flex items-center gap-2 text-green-400 animate-bounce">
-                        <Siren className="w-5 h-5" />
-                        <span className="text-xs font-bold uppercase tracking-wider">SNIPER SIGNAL</span>
-                     </div>
+                    <div className="mt-4 flex items-center gap-2 text-green-400 animate-bounce">
+                      <Siren className="w-5 h-5" />
+                      <span className="text-xs font-bold uppercase tracking-wider">SNIPER SIGNAL</span>
+                    </div>
                   )}
                 </>
               ) : (
                 <div className="text-slate-500 flex flex-col items-center animate-pulse">
-                   <RefreshCw className="w-8 h-8 mb-2 animate-spin" />
-                   <span>Scanning Market...</span>
+                  <RefreshCw className="w-8 h-8 mb-2 animate-spin" />
+                  <span>Scanning Market...</span>
                 </div>
               )}
             </div>
@@ -651,39 +649,39 @@ const App: React.FC = () => {
 
           {/* Manual Trade Actions */}
           <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800">
-             <div className="flex justify-between items-center mb-4">
-                <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Manual Entry</h3>
-                <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded border border-green-500/30">
-                  Target: {selectedAsset.name}
-                </span>
-             </div>
-             
-             <div className="grid grid-cols-2 gap-4 mb-4">
-                <button 
-                  disabled={!prediction}
-                  className="bg-green-600 hover:bg-green-500 active:scale-95 transition-all py-4 rounded-xl flex flex-col items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed group"
-                >
-                  <TrendingUp className="w-6 h-6 text-white mb-1 group-hover:-translate-y-1 transition-transform" />
-                  <span className="font-bold text-white">CALL (UP)</span>
-                </button>
-                <button 
-                  disabled={!prediction}
-                  className="bg-red-600 hover:bg-red-500 active:scale-95 transition-all py-4 rounded-xl flex flex-col items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed group"
-                >
-                  <TrendingDown className="w-6 h-6 text-white mb-1 group-hover:translate-y-1 transition-transform" />
-                  <span className="font-bold text-white">PUT (DOWN)</span>
-                </button>
-             </div>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Manual Entry</h3>
+              <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded border border-green-500/30">
+                Target: {selectedAsset.name}
+              </span>
+            </div>
 
-             <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg border border-slate-700">
-               <div className="flex items-center gap-3">
-                 <div className={`w-10 h-6 rounded-full p-1 cursor-pointer transition-colors ${autoTrade ? 'bg-cyan-500' : 'bg-slate-600'}`} onClick={() => setAutoTrade(!autoTrade)}>
-                   <div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform ${autoTrade ? 'translate-x-4' : ''}`}></div>
-                 </div>
-                 <span className="text-sm font-medium text-slate-300">Copy Trading Bot</span>
-               </div>
-               {autoTrade ? <Play className="w-4 h-4 text-cyan-400" /> : <Pause className="w-4 h-4 text-slate-500" />}
-             </div>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <button
+                disabled={!prediction}
+                className="bg-green-600 hover:bg-green-500 active:scale-95 transition-all py-4 rounded-xl flex flex-col items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed group"
+              >
+                <TrendingUp className="w-6 h-6 text-white mb-1 group-hover:-translate-y-1 transition-transform" />
+                <span className="font-bold text-white">CALL (UP)</span>
+              </button>
+              <button
+                disabled={!prediction}
+                className="bg-red-600 hover:bg-red-500 active:scale-95 transition-all py-4 rounded-xl flex flex-col items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed group"
+              >
+                <TrendingDown className="w-6 h-6 text-white mb-1 group-hover:translate-y-1 transition-transform" />
+                <span className="font-bold text-white">PUT (DOWN)</span>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg border border-slate-700">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-6 rounded-full p-1 cursor-pointer transition-colors ${autoTrade ? 'bg-cyan-500' : 'bg-slate-600'}`} onClick={() => setAutoTrade(!autoTrade)}>
+                  <div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform ${autoTrade ? 'translate-x-4' : ''}`}></div>
+                </div>
+                <span className="text-sm font-medium text-slate-300">Copy Trading Bot</span>
+              </div>
+              {autoTrade ? <Play className="w-4 h-4 text-cyan-400" /> : <Pause className="w-4 h-4 text-slate-500" />}
+            </div>
           </div>
 
         </div>

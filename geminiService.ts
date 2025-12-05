@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { TechnicalIndicators, SignalType, PredictionResult } from '../types';
+import { TechnicalIndicators, SignalType, PredictionResult } from './types';
 
 // Key for LocalStorage
 const STORAGE_KEY = 'tradepulse_gemini_api_key';
@@ -18,9 +18,9 @@ export const getStoredApiKey = (): string | null => {
 };
 
 export const removeApiKey = () => {
-    if (typeof window !== 'undefined') {
-        localStorage.removeItem(STORAGE_KEY);
-    }
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(STORAGE_KEY);
+  }
 };
 
 // Helper to get client safely
@@ -39,50 +39,52 @@ export const initializeGemini = () => {
   // Initialization is handled dynamically
 };
 
-// --- LOCAL MATH ENGINE (Fallback rigoroso) ---
+// --- LOCAL PYTHON LOGIC EMULATION (Fallback Rigoroso) ---
+// Simula exatamente o que o script Python faria se a API falhar
 const calculateLocalPrediction = (indicators: TechnicalIndicators, errorContext?: string): PredictionResult => {
-    const { rsi, macd } = indicators;
-    let signal = SignalType.WAIT; 
-    let prob = 0;
-    let rationale = "Scanning market telemetry...";
+  const { rsi, macd } = indicators;
+  let signal = SignalType.WAIT;
+  let prob = 0;
+  let rationale = "Calculating algo telemetry...";
 
-    // ESTRATÉGIA PYTHONICA "SNIPER" (Simulada localmente)
-    // def is_sniper_entry(rsi, macd_hist):
-    //    return (rsi < 15 and macd_hist > 0) or (rsi > 85 and macd_hist < 0)
-    
-    if (rsi < 15 && macd.histogram > 0) { 
-      signal = SignalType.BUY;
-      prob = 94; 
-      rationale = "ALGO: Oversold Condition (RSI < 15) + Bullish Divergence detected via Python logic.";
-    } else if (rsi > 85 && macd.histogram < 0) { 
-      signal = SignalType.SELL;
-      prob = 94; 
-      rationale = "ALGO: Overbought Condition (RSI > 85) + Bearish Crossover detected via Python logic.";
-    } 
-    else if (rsi > 60 && rsi < 75 && macd.histogram > 0.00005 && macd.macdLine > macd.signalLine) {
-       signal = SignalType.BUY;
-       prob = 86; 
-       rationale = "TREND: Bullish momentum structure valid. Continuing trend.";
-    }
-    else if (rsi < 40 && rsi > 25 && macd.histogram < -0.00005 && macd.macdLine < macd.signalLine) {
-       signal = SignalType.SELL;
-       prob = 86;
-       rationale = "TREND: Bearish momentum structure valid. Continuing trend.";
-    }
-    else {
-      prob = 45;
-      signal = SignalType.WAIT;
-      rationale = "FILTER: Market noise detected. No statistical edge > 90%.";
-    }
+  // REGRAS ESTRITAS DO BOT PYTHON (SNIPER)
+  // 1. Condição de Compra Sniper: RSI abaixo de 15 (Sobrevenda Extrema) + MACD Histogram virando positivo
+  if (rsi < 15 && macd.histogram > 0) {
+    signal = SignalType.BUY;
+    prob = 96;
+    rationale = `ALGO: CRITICAL OVERSOLD (RSI ${rsi.toFixed(2)}) + BULLISH DIVERGENCE. EXECUTE IMMEDIATELY.`;
+  }
+  // 2. Condição de Venda Sniper: RSI acima de 85 (Sobrecompra Extrema) + MACD Histogram virando negativo
+  else if (rsi > 85 && macd.histogram < 0) {
+    signal = SignalType.SELL;
+    prob = 96;
+    rationale = `ALGO: CRITICAL OVERBOUGHT (RSI ${rsi.toFixed(2)}) + BEARISH DIVERGENCE. EXECUTE IMMEDIATELY.`;
+  }
+  // 3. Estratégia de Tendência (Menor Probabilidade, mas válida)
+  else if (rsi > 55 && rsi < 75 && macd.histogram > 0 && macd.macdLine > macd.signalLine) {
+    signal = SignalType.BUY;
+    prob = 82;
+    rationale = "TREND: Positive momentum structure confirmed. Continuation likely.";
+  }
+  else if (rsi < 45 && rsi > 25 && macd.histogram < 0 && macd.macdLine < macd.signalLine) {
+    signal = SignalType.SELL;
+    prob = 82;
+    rationale = "TREND: Negative momentum structure confirmed. Continuation likely.";
+  }
+  else {
+    prob = 10;
+    signal = SignalType.WAIT;
+    rationale = "FILTER: Market noise detected. No statistical edge found > 90%.";
+  }
 
-    const prefix = errorContext ? `[${errorContext}] ` : "[LOCAL CORE] ";
+  const prefix = errorContext ? `[${errorContext} MODE] ` : "[LOCAL CORE] ";
 
-    return {
-      probability: Math.floor(prob),
-      signal,
-      rationale: prefix + rationale,
-      timestamp: Date.now()
-    };
+  return {
+    probability: Math.floor(prob),
+    signal,
+    rationale: prefix + rationale,
+    timestamp: Date.now()
+  };
 };
 
 export const getGeminiPrediction = async (
@@ -93,64 +95,79 @@ export const getGeminiPrediction = async (
   const ai = getAiClient();
 
   if (!ai) {
-    return calculateLocalPrediction(indicators, "DEMO MODE");
+    return calculateLocalPrediction(indicators, "OFFLINE");
   }
 
   try {
-    // PROMPT: ENGENHEIRO DE SOFTWARE PYTHON / TRADING ALGORTIMICO
+    // --- PROMPT DE ENGENHARIA DE SOFTWARE ---
+    // Instruímos a IA a agir como um interpretador Python rodando uma função específica.
     const prompt = `
-      ACT AS: Senior Python Quantitative Developer specializing in HFT (High Frequency Trading) and Binary Options bots.
+      ACT AS: Senior Python Quantitative Developer & Algorithmic Trader.
+      CONTEXT: You are the logic engine for a High-Frequency Trading (HFT) bot.
       
-      TASK: Analyze the provided market telemetry for ${symbol}.
-      OBJECTIVE: Identify a trade entry with >90% statistical probability of success based on Technical Analysis.
+      YOUR GOAL: Analyze the input telemetry and execute the 'sniper_logic' function defined below.
 
-      TELEMETRY DATA (JSON):
+      INPUT TELEMETRY (JSON):
       {
-        "price": ${price},
-        "rsi_14": ${indicators.rsi.toFixed(2)},
-        "macd_hist": ${indicators.macd.histogram.toFixed(6)},
-        "sma_20": ${indicators.sma.toFixed(2)}
+        "asset": "${symbol}",
+        "current_price": ${price},
+        "rsi_14": ${indicators.rsi.toFixed(4)},
+        "macd_histogram": ${indicators.macd.histogram.toFixed(8)}
       }
 
-      ALGORITHMIC RULES (PYTHON LOGIC):
-      1. def calculate_entry():
-           # REVERSAL STRATEGY (SNIPER)
-           if rsi < 20 and macd_hist > 0: return "BUY", 95
-           if rsi > 80 and macd_hist < 0: return "SELL", 95
-           
-           # TREND FOLLOWING STRATEGY
-           if 55 < rsi < 70 and macd_hist > 0: return "BUY", 88
-           if 30 < rsi < 45 and macd_hist < 0: return "SELL", 88
-           
-           return "WAIT", 0
+      PYTHON LOGIC TO EXECUTE (VIRTUAL):
+      
+      def sniper_logic(rsi, macd_hist):
+          """
+          Determines trade entry based on statistical extremes.
+          Returns: (Signal, Probability, Log)
+          """
+          # STRATEGY 1: THE SNIPER (Reversal at Extremes)
+          # Strict rule: RSI must be < 15 or > 85 to trigger 90%+ confidence.
+          
+          if rsi < 15.0 and macd_hist > 0:
+              return "BUY", 96, "CRITICAL: RSI Oversold (<15) with Momentum Shift. High probability Reversal."
+              
+          if rsi > 85.0 and macd_hist < 0:
+              return "SELL", 96, "CRITICAL: RSI Overbought (>85) with Momentum Shift. High probability Reversal."
 
-      2. STRICT FILTER:
-         - If calculated probability < 90%, set signal to "WAIT".
-         - Do not force a trade. Be extremely critical.
+          # STRATEGY 2: TREND FOLLOWING (Lower Confidence)
+          if 55 < rsi < 75 and macd_hist > 0:
+              return "BUY", 82, "Trend: Bullish momentum continuation."
+              
+          if 25 < rsi < 45 and macd_hist < 0:
+              return "SELL", 82, "Trend: Bearish momentum continuation."
 
-      OUTPUT:
-      Return a raw JSON object matching the schema.
+          # DEFAULT: NOISE
+          return "WAIT", 0, "Noise: Market conditions do not meet statistical thresholds."
+
+      INSTRUCTIONS:
+      1. Mentally run the input numbers through the 'sniper_logic' function.
+      2. Output the result EXACTLY as the function would return it.
+      3. Be cold, calculated, and precise. No financial advice disclaimers needed, this is a simulation.
+      
+      OUTPUT FORMAT:
+      Return ONLY a JSON object: { "probability": number, "signal": "BUY"|"SELL"|"WAIT", "rationale": "string" }
     `;
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
-        systemInstruction: "You are a trading bot backend written in Python. You are emotionless and rely solely on math. If the probability is not >90%, return WAIT.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             probability: { type: Type.NUMBER, description: "Win Probability (0-100)" },
             signal: { type: Type.STRING, enum: ["BUY", "SELL", "WAIT", "NEUTRAL"], description: "Action" },
-            rationale: { type: Type.STRING, description: "Technical justification using python/algo terms" }
+            rationale: { type: Type.STRING, description: "Technical justification from the python logic" }
           }
         }
       }
     });
 
     const json = JSON.parse(response.text || '{}');
-    
+
     return {
       probability: json.probability || 0,
       signal: (json.signal as SignalType) || SignalType.WAIT,
