@@ -25,17 +25,13 @@ export const removeApiKey = () => {
 
 // Helper to get client safely
 const getAiClient = () => {
-  // 1. Try Local Storage (User Input)
   const storedKey = getStoredApiKey();
   if (storedKey) {
     return new GoogleGenAI({ apiKey: storedKey });
   }
-
-  // 2. Try Environment Variable (Development/Build)
   if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
     return new GoogleGenAI({ apiKey: process.env.API_KEY });
   }
-
   return null;
 };
 
@@ -43,43 +39,43 @@ export const initializeGemini = () => {
   // Initialization is handled dynamically
 };
 
-// --- LOCAL MATH ENGINE (Fallback) ---
+// --- LOCAL MATH ENGINE (Fallback rigoroso) ---
 const calculateLocalPrediction = (indicators: TechnicalIndicators, errorContext?: string): PredictionResult => {
-    const { rsi, macd, sma } = indicators;
-    let signal = SignalType.NEUTRAL;
-    let prob = 50;
-    let rationale = "Market in consolidation. Awaiting clear breakout.";
+    const { rsi, macd } = indicators;
+    let signal = SignalType.WAIT; 
+    let prob = 0;
+    let rationale = "Scanning market telemetry...";
 
-    // Strict Mathematical Strategy for Binary Options (Short term reversal/continuation)
-    if (rsi < 20 && macd.histogram > 0) {
+    // ESTRATÉGIA PYTHONICA "SNIPER" (Simulada localmente)
+    // def is_sniper_entry(rsi, macd_hist):
+    //    return (rsi < 15 and macd_hist > 0) or (rsi > 85 and macd_hist < 0)
+    
+    if (rsi < 15 && macd.histogram > 0) { 
       signal = SignalType.BUY;
-      prob = 93; 
-      rationale = "SNIPER ENTRY: Extreme oversold (RSI < 20) + Momentum flip.";
-    } else if (rsi > 80 && macd.histogram < 0) {
+      prob = 94; 
+      rationale = "ALGO: Oversold Condition (RSI < 15) + Bullish Divergence detected via Python logic.";
+    } else if (rsi > 85 && macd.histogram < 0) { 
       signal = SignalType.SELL;
       prob = 94; 
-      rationale = "SNIPER ENTRY: Extreme overbought (RSI > 80) + Bearish divergence.";
+      rationale = "ALGO: Overbought Condition (RSI > 85) + Bearish Crossover detected via Python logic.";
     } 
-    else if (rsi > 55 && rsi < 70 && macd.histogram > 0.00005 && macd.macdLine > macd.signalLine) {
+    else if (rsi > 60 && rsi < 75 && macd.histogram > 0.00005 && macd.macdLine > macd.signalLine) {
        signal = SignalType.BUY;
-       prob = 82;
-       rationale = "Trend Continuation: Strong Bullish momentum confirmed.";
+       prob = 86; 
+       rationale = "TREND: Bullish momentum structure valid. Continuing trend.";
     }
-    else if (rsi < 45 && rsi > 30 && macd.histogram < -0.00005 && macd.macdLine < macd.signalLine) {
+    else if (rsi < 40 && rsi > 25 && macd.histogram < -0.00005 && macd.macdLine < macd.signalLine) {
        signal = SignalType.SELL;
-       prob = 82;
-       rationale = "Trend Continuation: Strong Bearish momentum confirmed.";
+       prob = 86;
+       rationale = "TREND: Bearish momentum structure valid. Continuing trend.";
     }
-    else if (Math.abs(macd.histogram) < 0.00001) {
+    else {
+      prob = 45;
       signal = SignalType.WAIT;
-      prob = 30;
-      rationale = "DEAD ZONE: No volatility. Do not trade.";
+      rationale = "FILTER: Market noise detected. No statistical edge > 90%.";
     }
 
-    // Add slight noise to simulate market flux
-    prob = Math.min(99, Math.max(10, prob + (Math.random() * 2 - 1)));
-    
-    const prefix = errorContext ? `[${errorContext}] ` : "[MATH CORE] ";
+    const prefix = errorContext ? `[${errorContext}] ` : "[LOCAL CORE] ";
 
     return {
       probability: Math.floor(prob),
@@ -96,42 +92,58 @@ export const getGeminiPrediction = async (
 ): Promise<PredictionResult> => {
   const ai = getAiClient();
 
-  // If no key, use local math immediately
   if (!ai) {
     return calculateLocalPrediction(indicators, "DEMO MODE");
   }
 
   try {
+    // PROMPT: ENGENHEIRO DE SOFTWARE PYTHON / TRADING ALGORTIMICO
     const prompt = `
-      Act as a world-class Binary Options Analyst. 
-      Analyze the immediate 1-minute candle direction for ${symbol}.
-      Current Price: ${price}
+      ACT AS: Senior Python Quantitative Developer specializing in HFT (High Frequency Trading) and Binary Options bots.
       
-      Indicators:
-      - RSI (14): ${indicators.rsi.toFixed(2)}
-      - MACD Histogram: ${indicators.macd.histogram.toFixed(6)}
-      - SMA (20): ${indicators.sma.toFixed(2)}
+      TASK: Analyze the provided market telemetry for ${symbol}.
+      OBJECTIVE: Identify a trade entry with >90% statistical probability of success based on Technical Analysis.
 
-      STRICT RULES FOR 90%+ PROBABILITY:
-      1. ONLY return probability > 90 if RSI is extreme (<25 or >75) AND MACD confirms reversal.
-      2. If the market is ranging (RSI 40-60), return probability < 60 and Signal WAIT.
-      3. Focus on "Sniper Entries" - the exact moment of reversal.
-      
-      Output JSON only.
+      TELEMETRY DATA (JSON):
+      {
+        "price": ${price},
+        "rsi_14": ${indicators.rsi.toFixed(2)},
+        "macd_hist": ${indicators.macd.histogram.toFixed(6)},
+        "sma_20": ${indicators.sma.toFixed(2)}
+      }
+
+      ALGORITHMIC RULES (PYTHON LOGIC):
+      1. def calculate_entry():
+           # REVERSAL STRATEGY (SNIPER)
+           if rsi < 20 and macd_hist > 0: return "BUY", 95
+           if rsi > 80 and macd_hist < 0: return "SELL", 95
+           
+           # TREND FOLLOWING STRATEGY
+           if 55 < rsi < 70 and macd_hist > 0: return "BUY", 88
+           if 30 < rsi < 45 and macd_hist < 0: return "SELL", 88
+           
+           return "WAIT", 0
+
+      2. STRICT FILTER:
+         - If calculated probability < 90%, set signal to "WAIT".
+         - Do not force a trade. Be extremely critical.
+
+      OUTPUT:
+      Return a raw JSON object matching the schema.
     `;
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
-        systemInstruction: "You are a ruthlessly accurate trading bot. Do not hallucinate trends. If uncertain, signal WAIT.",
+        systemInstruction: "You are a trading bot backend written in Python. You are emotionless and rely solely on math. If the probability is not >90%, return WAIT.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            probability: { type: Type.NUMBER, description: "Win probability (0-100)" },
-            signal: { type: Type.STRING, enum: ["BUY", "SELL", "NEUTRAL", "WAIT"], description: "Action" },
-            rationale: { type: Type.STRING, description: "Short, punchy reason." }
+            probability: { type: Type.NUMBER, description: "Win Probability (0-100)" },
+            signal: { type: Type.STRING, enum: ["BUY", "SELL", "WAIT", "NEUTRAL"], description: "Action" },
+            rationale: { type: Type.STRING, description: "Technical justification using python/algo terms" }
           }
         }
       }
@@ -140,31 +152,16 @@ export const getGeminiPrediction = async (
     const json = JSON.parse(response.text || '{}');
     
     return {
-      probability: json.probability || 50,
-      signal: (json.signal as SignalType) || SignalType.NEUTRAL,
-      rationale: json.rationale || "Analyzing...",
+      probability: json.probability || 0,
+      signal: (json.signal as SignalType) || SignalType.WAIT,
+      rationale: json.rationale || "Calculating...",
       timestamp: Date.now()
     };
 
   } catch (error: any) {
-    console.warn("Gemini Analysis Error:", error);
-    
+    console.warn("Gemini Error:", error);
     let errorType = "API ERROR";
-    const errorString = error.toString().toLowerCase();
-    
-    if (errorString.includes("api_key") || errorString.includes("permission")) {
-        errorType = "INVALID KEY";
-    }
-    else if (errorString.includes("429") || errorString.includes("quota") || errorString.includes("exhausted")) {
-        errorType = "QUOTA LIMIT";
-    }
-
+    if (error.toString().includes("429")) errorType = "QUOTA LIMIT";
     return calculateLocalPrediction(indicators, errorType);
   }
 };
-
-
-
-
-
- 
