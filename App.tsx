@@ -302,27 +302,27 @@ const App: React.FC = () => {
   const isHighProb = prediction && prediction.probability >= 90 && (prediction.signal === 'BUY' || prediction.signal === 'SELL');
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-cyan-500/30">
+    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-cyan-500/30 pb-20 md:pb-0">
 
       {/* --- HIGH PROBABILITY ALERT OVERLAY --- */}
       {isHighProb && timeLeft < 40 && timeLeft > 5 && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-green-900/20 backdrop-blur-sm animate-pulse pointer-events-none">
-          <div className="bg-slate-900/90 border-2 border-green-500 p-8 rounded-3xl shadow-[0_0_50px_rgba(34,197,94,0.5)] flex flex-col items-center animate-bounce-slow">
-            <Siren className="w-16 h-16 text-green-400 mb-4 animate-spin-slow" />
-            <h1 className="text-4xl font-black text-white uppercase tracking-tighter mb-2">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-green-900/20 backdrop-blur-sm animate-pulse pointer-events-none px-4">
+          <div className="bg-slate-900/90 border-2 border-green-500 p-6 md:p-8 rounded-3xl shadow-[0_0_50px_rgba(34,197,94,0.5)] flex flex-col items-center animate-bounce-slow text-center max-w-sm md:max-w-md w-full">
+            <Siren className="w-12 h-12 md:w-16 md:h-16 text-green-400 mb-4 animate-spin-slow" />
+            <h1 className="text-2xl md:text-4xl font-black text-white uppercase tracking-tighter mb-2">
               OPPORTUNITY DETECTED
             </h1>
             <div className="flex items-center gap-4 mt-2">
-              <span className={`text-5xl font-bold ${prediction?.signal === 'BUY' ? 'text-green-400' : 'text-red-500'}`}>
+              <span className={`text-3xl md:text-5xl font-bold ${prediction?.signal === 'BUY' ? 'text-green-400' : 'text-red-500'}`}>
                 {prediction?.signal} NOW
               </span>
-              <div className="h-12 w-[2px] bg-slate-600"></div>
+              <div className="h-8 md:h-12 w-[2px] bg-slate-600"></div>
               <div className="flex flex-col items-center">
-                <span className="text-sm text-slate-400 uppercase">Time Left</span>
-                <span className="text-4xl font-mono font-bold text-white">{timeLeft}s</span>
+                <span className="text-xs md:text-sm text-slate-400 uppercase">Time Left</span>
+                <span className="text-2xl md:text-4xl font-mono font-bold text-white">{timeLeft}s</span>
               </div>
             </div>
-            <p className="mt-4 text-slate-300 font-medium bg-slate-800 px-4 py-2 rounded-lg">
+            <p className="mt-4 text-slate-300 text-sm md:text-base font-medium bg-slate-800 px-4 py-2 rounded-lg">
               {prediction?.rationale}
             </p>
           </div>
@@ -332,7 +332,7 @@ const App: React.FC = () => {
       {/* Settings Modal */}
       {showSettings && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full mx-auto shadow-2xl">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-white flex items-center gap-2">
                 <Settings className="w-6 h-6 text-cyan-400" /> Settings
@@ -382,8 +382,8 @@ const App: React.FC = () => {
       {/* Broker Selection Modal */}
       {showBrokerModal && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full mx-auto shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center mb-4 shrink-0">
               <h3 className="text-xl font-bold text-white flex items-center gap-2">
                 <Globe className="w-6 h-6 text-cyan-400" /> Select Target Broker
               </h3>
@@ -392,11 +392,11 @@ const App: React.FC = () => {
               </button>
             </div>
 
-            <p className="text-sm text-slate-400 mb-6">
+            <p className="text-sm text-slate-400 mb-6 shrink-0">
               Select the broker you are manually trading on. TradePulse will analyze market data (via Binance/OTC) and generate signals optimized for your platform's timeframe.
             </p>
 
-            <div className="space-y-3">
+            <div className="space-y-3 overflow-y-auto scrollbar-thin">
               {BROKERS.map(broker => (
                 <button
                   key={broker.id}
@@ -431,23 +431,23 @@ const App: React.FC = () => {
 
       {/* Header */}
       <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="max-w-7xl mx-auto px-4 py-3 md:py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 md:gap-3">
             <div className="bg-cyan-500/20 p-2 rounded-lg">
-              <Activity className="w-6 h-6 text-cyan-400" />
+              <Activity className="w-5 h-5 md:w-6 md:h-6 text-cyan-400" />
             </div>
             <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+              <h1 className="text-lg md:text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
                 TradePulse AI
               </h1>
-              <p className="text-xs text-slate-500 flex items-center gap-1">
+              <p className="text-[10px] md:text-xs text-slate-500 flex items-center gap-1">
                 <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
                 {selectedAsset.isSimulated ? 'Simulation Stream' : 'Binance Live Stream'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             <div className="hidden md:flex flex-col items-end mr-4">
               <span className="text-xs text-slate-400">Target Broker</span>
               <span className={`text-sm font-bold ${activeBroker.color}`}>{activeBroker.name}</span>
@@ -463,34 +463,34 @@ const App: React.FC = () => {
 
             <button
               onClick={() => setShowBrokerModal(true)}
-              className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+              className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-colors flex items-center gap-2"
             >
-              <Lock className="w-4 h-4" /> Connect Broker
+              <Lock className="w-3 h-3 md:w-4 md:h-4" /> <span className="hidden md:inline">Connect Broker</span><span className="md:hidden">Broker</span>
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <main className="max-w-7xl mx-auto px-4 py-4 md:py-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* Left Column: Chart & Controls */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4 md:space-y-6">
 
           {/* Asset Selector */}
           <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-3 gap-3">
               <h3 className="text-sm font-medium text-slate-400 flex items-center gap-2">
                 <BarChart3 className="w-4 h-4" /> Market Selector
               </h3>
               <input
                 type="text"
                 placeholder="Search asset..."
-                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1 text-xs focus:outline-none focus:border-cyan-500"
+                className="w-full md:w-auto bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 md:py-1 text-sm md:text-xs focus:outline-none focus:border-cyan-500"
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
 
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin -mx-4 px-4 md:mx-0 md:px-0">
               {['Crypto', 'OTC', 'Stocks', 'Forex', 'Commodities'].map(cat => (
                 <div key={cat} className="flex-shrink-0">
                   <span className="text-xs font-bold text-slate-500 uppercase px-2 mb-1 block">{cat}</span>
@@ -523,23 +523,26 @@ const App: React.FC = () => {
           </div>
 
           {/* Main Chart */}
-          <div className="relative group">
+          <div className="relative group bg-slate-900 rounded-xl border border-slate-800 p-1">
             <div className="absolute top-4 left-4 z-10 bg-slate-900/80 backdrop-blur px-3 py-1 rounded-lg border border-slate-700">
-              <span className="text-3xl font-bold text-white tracking-tight mr-2">
+              <span className="text-2xl md:text-3xl font-bold text-white tracking-tight mr-2">
                 ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
               </span>
-              <span className="text-xs text-green-400 font-mono">
+              <span className="text-xs text-green-400 font-mono block md:inline">
                 Payout: {selectedAsset.profit}%
               </span>
             </div>
-            <Chart data={candles} color={currentPrice > (candles[0]?.close || 0) ? '#10b981' : '#ef4444'} />
+            {/* Chart is its own component so we just wrap it */}
+            <div className="h-[300px] md:h-64 w-full pt-16 md:pt-0">
+              <Chart data={candles} color={currentPrice > (candles[0]?.close || 0) ? '#10b981' : '#ef4444'} />
+            </div>
           </div>
 
           {/* Technical Grid */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-slate-900 rounded-xl p-4 border border-slate-800">
-              <span className="text-xs text-slate-500 uppercase tracking-wider">RSI (14)</span>
-              <div className="text-2xl font-bold mt-1 text-slate-200">
+          <div className="grid grid-cols-3 gap-2 md:gap-4">
+            <div className="bg-slate-900 rounded-xl p-3 md:p-4 border border-slate-800">
+              <span className="text-[10px] md:text-xs text-slate-500 uppercase tracking-wider">RSI (14)</span>
+              <div className="text-lg md:text-2xl font-bold mt-1 text-slate-200">
                 {indicators?.rsi.toFixed(2) || '--'}
               </div>
               <div className="h-1.5 w-full bg-slate-800 rounded-full mt-2 overflow-hidden">
@@ -549,19 +552,19 @@ const App: React.FC = () => {
                 ></div>
               </div>
             </div>
-            <div className="bg-slate-900 rounded-xl p-4 border border-slate-800">
-              <span className="text-xs text-slate-500 uppercase tracking-wider">MACD Hist</span>
-              <div className={`text-2xl font-bold mt-1 ${indicators?.macd.histogram && indicators.macd.histogram > 0 ? 'text-green-400' : 'text-red-400'}`}>
+            <div className="bg-slate-900 rounded-xl p-3 md:p-4 border border-slate-800">
+              <span className="text-[10px] md:text-xs text-slate-500 uppercase tracking-wider">MACD Hist</span>
+              <div className={`text-lg md:text-2xl font-bold mt-1 ${indicators?.macd.histogram && indicators.macd.histogram > 0 ? 'text-green-400' : 'text-red-400'}`}>
                 {indicators?.macd.histogram.toFixed(5) || '--'}
               </div>
-              <span className="text-xs text-slate-600">Trend Strength</span>
+              <span className="text-[10px] md:text-xs text-slate-600 block truncate">Trend Strength</span>
             </div>
-            <div className="bg-slate-900 rounded-xl p-4 border border-slate-800">
-              <span className="text-xs text-slate-500 uppercase tracking-wider">Entry Window</span>
-              <div className="text-2xl font-mono font-bold mt-1 text-cyan-400 flex items-center gap-2">
-                <Timer className="w-5 h-5" /> {timeLeft}s
+            <div className="bg-slate-900 rounded-xl p-3 md:p-4 border border-slate-800">
+              <span className="text-[10px] md:text-xs text-slate-500 uppercase tracking-wider">Entry Window</span>
+              <div className="text-lg md:text-2xl font-mono font-bold mt-1 text-cyan-400 flex items-center gap-2">
+                <Timer className="w-4 h-4 md:w-5 md:h-5" /> {timeLeft}s
               </div>
-              <span className="text-xs text-slate-600">Until Next Candle</span>
+              <span className="text-[10px] md:text-xs text-slate-600 block truncate">Until Next Candle</span>
             </div>
           </div>
 
@@ -570,13 +573,13 @@ const App: React.FC = () => {
             <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
             <p className="text-xs text-yellow-500/80">
               <strong>Active Mode: {activeBroker.name} ({activeBroker.type})</strong><br />
-              Using Binance WebSocket data as a proxy for price action. Prices on {activeBroker.name} may vary slightly due to spread or OTC manipulation.
+              Using Binance WebSocket data as a proxy. Prices on {activeBroker.name} may vary.
             </p>
           </div>
         </div>
 
         {/* Right Column: AI Predictions & Actions */}
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
 
           {/* Signal Card */}
           <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 shadow-xl relative overflow-hidden">
@@ -611,7 +614,7 @@ const App: React.FC = () => {
             <div className="flex flex-col items-center justify-center py-6">
               {prediction ? (
                 <>
-                  <div className={`text-5xl font-black tracking-tighter mb-2 transition-all duration-500 ${getConfidenceColor(prediction.probability)} ${prediction.probability > 90 ? 'scale-110 animate-pulse' : ''}`}>
+                  <div className={`text-4xl md:text-5xl font-black tracking-tighter mb-2 transition-all duration-500 ${getConfidenceColor(prediction.probability)} ${prediction.probability > 90 ? 'scale-110 animate-pulse' : ''}`}>
                     {prediction.probability}%
                   </div>
                   <span className="text-sm text-slate-400 uppercase tracking-widest font-medium">Win Probability</span>
