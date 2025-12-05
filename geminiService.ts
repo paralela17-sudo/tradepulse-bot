@@ -29,8 +29,8 @@ const getAiClient = () => {
   if (storedKey) {
     return new GoogleGenAI({ apiKey: storedKey });
   }
-  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-    return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  if (import.meta.env && import.meta.env.VITE_API_KEY) {
+    return new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
   }
   return null;
 };
