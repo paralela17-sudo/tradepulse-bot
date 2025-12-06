@@ -290,17 +290,25 @@ const App: React.FC = () => {
     setIsAnalyzing(false);
   }, [candles, selectedAsset.name]);
 
+  // Track if we've already scanned for the current candle to avoid duplicates or misses
+  const lastScannedTimeRef = useRef<number>(0);
+
   useEffect(() => {
     if (candles.length < 20) return;
 
     const currentIndicators = analyzeMarket(candles);
     setIndicators(currentIndicators);
 
-    // Auto-analyze near the 30s mark to give user time to react
-    if (enableAI && timeLeft === 30) {
+    // Auto-analyze Logic: Trigger ONCE per candle around the 35s-30s mark
+    // We use a broader window (35s to 25s) but check a ref to ensure we only do it once per minute.
+    const currentMinute = candles[candles.length - 1].time;
+
+    if (enableAI && timeLeft <= 35 && timeLeft >= 25 && lastScannedTimeRef.current !== currentMinute && !isAnalyzing) {
+      console.log("Triggering Auto-Scan for", new Date(currentMinute).toISOString());
+      lastScannedTimeRef.current = currentMinute;
       handleAnalysis(currentIndicators);
     }
-  }, [candles.length, timeLeft, enableAI, handleAnalysis]);
+  }, [candles.length, timeLeft, enableAI, handleAnalysis, isAnalyzing]); // dependencies updated
 
   const getSignalColor = (signal: SignalType) => {
     switch (signal) {
