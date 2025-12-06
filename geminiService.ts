@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { TechnicalIndicators, SignalType, PredictionResult } from './types';
 
 // Key for LocalStorage
@@ -87,25 +87,41 @@ const calculateLocalPrediction = (indicators: TechnicalIndicators, errorContext?
   };
 };
 
+const resultCache = new Map<string, { timestamp: number, data: PredictionResult }>();
+const CACHE_DURATION = 60 * 1000; // 60 seconds
+
 export const getGeminiPrediction = async (
   symbol: string,
   price: number,
-  indicators: TechnicalIndicators
+  indicators: TechnicalIndicators,
+  onStream?: (chunk: string) => void
 ): Promise<PredictionResult> => {
   const ai = getAiClient();
 
   if (!ai) {
+    if (onStream) onStream("AI Client not configured. Using local fallback...");
     return calculateLocalPrediction(indicators, "OFFLINE");
   }
 
+  // --- CACHE CHECK ---
+  // Create a cache key based on symbol (and roughly price/indicators if we wanted strictness, 
+  // but for "common pairs" 60s cache, symbol is usually sufficient/requested).
+  const cacheKey = symbol;
+  const cached = resultCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp < CACHE_DURATION)) {
+    if (onStream) onStream("(Cached Result) " + cached.data.rationale);
+    return cached.data;
+  }
+
   try {
-    // --- PROMPT DE ENGENHARIA DE SOFTWARE ---
-    // Instruímos a IA a agir como um interpretador Python rodando uma função específica.
+    // --- PROMPT ENGINEERING FOR STREAMING ---
+    // We request the rationale FIRST as plain text, then the JSON at the end.
+    // This allows us to stream the "thinking" process to the user.
     const prompt = `
       ACT AS: Senior Python Quantitative Developer & Algorithmic Trader.
       CONTEXT: You are the logic engine for a High-Frequency Trading (HFT) bot.
       
-      YOUR GOAL: Analyze the input telemetry and execute the 'sniper_logic' function defined below.
+      YOUR GOAL: Analyze the input telemetry and execute the 'sniper_logic' function.
 
       INPUT TELEMETRY (JSON):
       {
@@ -115,70 +131,72 @@ export const getGeminiPrediction = async (
         "macd_histogram": ${indicators.macd.histogram.toFixed(8)}
       }
 
-      PYTHON LOGIC TO EXECUTE (VIRTUAL):
-      
+      PYTHON LOGIC (VIRTUAL):
       def sniper_logic(rsi, macd_hist):
-          """
-          Determines trade entry based on statistical extremes.
-          Returns: (Signal, Probability, Log)
-          """
-          # STRATEGY 1: THE SNIPER (Reversal at Extremes)
-          # Strict rule: RSI must be < 15 or > 85 to trigger 90%+ confidence.
-          
-          if rsi < 15.0 and macd_hist > 0:
-              return "BUY", 96, "CRITICAL: RSI Oversold (<15) with Momentum Shift. High probability Reversal."
-              
-          if rsi > 85.0 and macd_hist < 0:
-              return "SELL", 96, "CRITICAL: RSI Overbought (>85) with Momentum Shift. High probability Reversal."
-
-          # STRATEGY 2: TREND FOLLOWING (Lower Confidence)
-          if 55 < rsi < 75 and macd_hist > 0:
-              return "BUY", 82, "Trend: Bullish momentum continuation."
-              
-          if 25 < rsi < 45 and macd_hist < 0:
-              return "SELL", 82, "Trend: Bearish momentum continuation."
-
-          # DEFAULT: NOISE
-          return "WAIT", 0, "Noise: Market conditions do not meet statistical thresholds."
+          if rsi < 15.0 and macd_hist > 0: return "BUY", 96, "CRITICAL: RSI Oversold (<15) + Bullish Div."
+          if rsi > 85.0 and macd_hist < 0: return "SELL", 96, "CRITICAL: RSI Overbought (>85) + Bearish Div."
+          if 55 < rsi < 75 and macd_hist > 0: return "BUY", 82, "Trend: Bullish momentum continuation."
+          if 25 < rsi < 45 and macd_hist < 0: return "SELL", 82, "Trend: Bearish momentum continuation."
+          return "WAIT", 0, "Noise: Market conditions unclear."
 
       INSTRUCTIONS:
-      1. Mentally run the input numbers through the 'sniper_logic' function.
-      2. Output the result EXACTLY as the function would return it.
-      3. Be cold, calculated, and precise. No financial advice disclaimers needed, this is a simulation.
-      
+      1. Analyze the data.
+      2. STREAM your rationale first as human readable text (start with "ANALYSIS:").
+      3. END with the JSON result.
+
       OUTPUT FORMAT:
-      Return ONLY a JSON object: { "probability": number, "signal": "BUY"|"SELL"|"WAIT", "rationale": "string" }
+      ANALYSIS: <Brief technical explanation of why you are taking this trade, 1-2 sentences>
+      JSON_RESULT: { "probability": number, "signal": "BUY"|"SELL"|"WAIT", "rationale": "string copy of analysis" }
     `;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+    // Use Gemini 1.5 Flash for speed
+    const streamResult = await ai.models.generateContentStream({
+      model: 'gemini-1.5-flash',
       contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            probability: { type: Type.NUMBER, description: "Win Probability (0-100)" },
-            signal: { type: Type.STRING, enum: ["BUY", "SELL", "WAIT", "NEUTRAL"], description: "Action" },
-            rationale: { type: Type.STRING, description: "Technical justification from the python logic" }
-          }
-        }
-      }
     });
 
-    const json = JSON.parse(response.text || '{}');
+    let fullText = '';
+    let rationaleStreamed = '';
 
-    return {
+    for await (const chunk of streamResult) {
+      const chunkText = chunk.text || "";
+      fullText += chunkText;
+
+      // Simple streaming of the rationale part logic
+      // We try to strip "JSON_RESULT" if it appears to avoid showing JSON to user
+      const cleanChunk = chunkText.replace(/JSON_RESULT[\s\S]*/, '');
+      rationaleStreamed += cleanChunk;
+
+      if (onStream) {
+        // Pass the accumulated rationale so far, cleaning up the 'ANALYSIS:' prefix if present
+        onStream(rationaleStreamed.replace('ANALYSIS:', '').trim());
+      }
+    }
+
+    // Parse the final JSON
+    // We look for the JSON object at the end of the string
+    const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("No JSON found in response");
+    }
+
+    const json = JSON.parse(jsonMatch[0]);
+
+    const result: PredictionResult = {
       probability: json.probability || 0,
       signal: (json.signal as SignalType) || SignalType.WAIT,
-      rationale: json.rationale || "Calculating...",
+      rationale: json.rationale || rationaleStreamed.replace('ANALYSIS:', '').trim(),
       timestamp: Date.now()
     };
 
+    // Save to Cache
+    resultCache.set(cacheKey, { timestamp: Date.now(), data: result });
+
+    return result;
+
   } catch (error: any) {
+    if (onStream) onStream(`Error: ${error.message}. Falling back to local logic.`);
     console.warn("Gemini Error:", error);
-    let errorType = "API ERROR";
-    if (error.toString().includes("429")) errorType = "QUOTA LIMIT";
-    return calculateLocalPrediction(indicators, errorType);
+    return calculateLocalPrediction(indicators, "API ERROR");
   }
 };

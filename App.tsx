@@ -262,7 +262,30 @@ const App: React.FC = () => {
     if (candles.length === 0) return;
     setIsAnalyzing(true);
     const lastPrice = candles[candles.length - 1].close;
-    const result = await getGeminiPrediction(selectedAsset.name, lastPrice, inds);
+
+    // Reset prediction or set to loading state
+    setPrediction({
+      probability: 0,
+      signal: SignalType.WAIT,
+      rationale: "Starting analysis...",
+      timestamp: Date.now()
+    });
+
+    const result = await getGeminiPrediction(
+      selectedAsset.name,
+      lastPrice,
+      inds,
+      (streamedText) => {
+        // Live update the UI with the streaming rationale
+        setPrediction(prev => ({
+          probability: prev?.probability || 0,
+          signal: prev?.signal || SignalType.WAIT,
+          rationale: streamedText,
+          timestamp: Date.now()
+        }));
+      }
+    );
+
     setPrediction(result);
     setIsAnalyzing(false);
   }, [candles, selectedAsset.name]);
