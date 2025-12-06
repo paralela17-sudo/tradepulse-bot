@@ -104,8 +104,6 @@ export const getGeminiPrediction = async (
   }
 
   // --- CACHE CHECK ---
-  // Create a cache key based on symbol (and roughly price/indicators if we wanted strictness, 
-  // but for "common pairs" 60s cache, symbol is usually sufficient/requested).
   const cacheKey = symbol;
   const cached = resultCache.get(cacheKey);
   if (cached && (Date.now() - cached.timestamp < CACHE_DURATION)) {
@@ -114,9 +112,7 @@ export const getGeminiPrediction = async (
   }
 
   try {
-    // --- PROMPT ENGINEERING FOR STREAMING ---
-    // We request the rationale FIRST as plain text, then the JSON at the end.
-    // This allows us to stream the "thinking" process to the user.
+    // --- NON-STREAMING PROMPT (Stability Revert) ---
     const prompt = `
       ACT AS: Senior Python Quantitative Developer & Algorithmic Trader.
       CONTEXT: You are the logic engine for a High-Frequency Trading (HFT) bot.
@@ -141,51 +137,29 @@ export const getGeminiPrediction = async (
 
       INSTRUCTIONS:
       1. Analyze the data.
-      2. STREAM your rationale first as human readable text (start with "ANALYSIS:").
-      3. END with the JSON result.
+      2. Output the result EXACTLY as the function would return it.
+      3. Return ONLY a JSON object.
 
       OUTPUT FORMAT:
-      ANALYSIS: <Brief technical explanation of why you are taking this trade, 1-2 sentences>
-      JSON_RESULT: { "probability": number, "signal": "BUY"|"SELL"|"WAIT", "rationale": "string copy of analysis" }
+      { "probability": number, "signal": "BUY"|"SELL"|"WAIT", "rationale": "string" }
     `;
 
-    // Use Gemini 1.5 Flash for speed
-    const streamResult = await ai.models.generateContentStream({
+    if (onStream) onStream("Analyzing market data (Optimized)...");
+
+    const response = await ai.models.generateContent({
       model: 'gemini-1.5-flash',
       contents: prompt,
+      config: {
+        responseMimeType: "application/json"
+      }
     });
 
-    let fullText = '';
-    let rationaleStreamed = '';
-
-    for await (const chunk of streamResult) {
-      const chunkText = chunk.text || "";
-      fullText += chunkText;
-
-      // Simple streaming of the rationale part logic
-      // We try to strip "JSON_RESULT" if it appears to avoid showing JSON to user
-      const cleanChunk = chunkText.replace(/JSON_RESULT[\s\S]*/, '');
-      rationaleStreamed += cleanChunk;
-
-      if (onStream) {
-        // Pass the accumulated rationale so far, cleaning up the 'ANALYSIS:' prefix if present
-        onStream(rationaleStreamed.replace('ANALYSIS:', '').trim());
-      }
-    }
-
-    // Parse the final JSON
-    // We look for the JSON object at the end of the string
-    const jsonMatch = fullText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON found in response");
-    }
-
-    const json = JSON.parse(jsonMatch[0]);
+    const json = JSON.parse(response.text || '{}');
 
     const result: PredictionResult = {
       probability: json.probability || 0,
       signal: (json.signal as SignalType) || SignalType.WAIT,
-      rationale: json.rationale || rationaleStreamed.replace('ANALYSIS:', '').trim(),
+      rationale: json.rationale || "Calculating...",
       timestamp: Date.now()
     };
 
@@ -195,7 +169,7 @@ export const getGeminiPrediction = async (
     return result;
 
   } catch (error: any) {
-    if (onStream) onStream(`Error: ${error.message}. Falling back to local logic.`);
+    if (onStream) onStream(`Error: ${error.message}.`);
     console.warn("Gemini Error:", error);
     return calculateLocalPrediction(indicators, "API ERROR");
   }
