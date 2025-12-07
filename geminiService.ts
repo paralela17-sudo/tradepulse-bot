@@ -188,7 +188,7 @@ export const getGeminiPrediction = async (
       errorType = "SLOW NETWORK";
     } else {
       // Shorten generic error for UI
-      errorType = "API: " + errorMsg.substring(0, 15) + "...";
+      errorType = "API: " + errorMsg.substring(0, 50);
     }
 
     if (onStream) onStream(`Failed: ${errorType}. Using local fallback.`);
