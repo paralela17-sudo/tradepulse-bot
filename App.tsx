@@ -4,6 +4,7 @@ import { Chart } from './Chart';
 import { Candle, TechnicalIndicators, PredictionResult, SignalType, Asset } from './types';
 import { analyzeMarket } from './indicators';
 import { getGeminiPrediction, initializeGemini, saveApiKey, getStoredApiKey, removeApiKey } from './geminiService';
+import { getCoinGeckoId, startCoinGeckoPricePolling } from './coinGeckoService';
 
 // Full Asset List based on user request
 const ASSETS: Asset[] = [
@@ -219,18 +220,80 @@ const App: React.FC = () => {
       }, 1000);
 
     } else {
-      // Use standard port 443 (implicit) for better firewall compatibility
+      // Try Binance WebSocket first
       const ws = new WebSocket(`wss://stream.binance.com/ws/${selectedAsset.symbol}@kline_1m`);
+      let wsConnected = false;
+      let coinGeckoFallbackTimer: ReturnType<typeof setInterval> | null = null;
 
       ws.onopen = () => {
+        wsConnected = true;
         setIsConnected(true);
-        setStatusMessage(""); // Clear "Connecting..." message
+        setStatusMessage("");
       };
 
       ws.onerror = (e) => {
         console.error("Binance WS Error:", e);
-        setIsConnected(false);
-        setStatusMessage("Connection Error (Binance)");
+        if (!wsConnected) {
+          // Binance failed, try CoinGecko fallback
+          const coinId = getCoinGeckoId(selectedAsset.symbol);
+          if (coinId) {
+            console.log(`Switching to CoinGecko for ${selectedAsset.name}`);
+            setStatusMessage("Using CoinGecko API (Binance blocked)");
+            setIsConnected(true);
+
+            // Initialize with current price
+            let lastPrice = selectedAsset.initialPrice;
+            const now = Date.now();
+            const initialCandles: Candle[] = [];
+
+            for (let i = 50; i > 0; i--) {
+              initialCandles.push({
+                time: now - (i * 60000),
+                open: lastPrice,
+                high: lastPrice * 1.001,
+                low: lastPrice * 0.999,
+                close: lastPrice,
+                volume: 0
+              });
+            }
+            setCandles(initialCandles);
+
+            // Start polling CoinGecko
+            coinGeckoFallbackTimer = startCoinGeckoPricePolling(coinId, (price) => {
+              setCurrentPrice(price);
+
+              const currentTimestamp = Date.now();
+              const currentMinute = Math.floor(currentTimestamp / 60000) * 60000;
+
+              setCandles(prev => {
+                const lastCandle = prev[prev.length - 1];
+
+                if (lastCandle && lastCandle.time === currentMinute) {
+                  const newCandles = [...prev];
+                  newCandles[newCandles.length - 1] = {
+                    ...lastCandle,
+                    close: price,
+                    high: Math.max(lastCandle.high, price),
+                    low: Math.min(lastCandle.low, price),
+                  };
+                  return newCandles;
+                } else {
+                  return [...prev, {
+                    time: currentMinute,
+                    open: price,
+                    high: price,
+                    low: price,
+                    close: price,
+                    volume: 0
+                  }].slice(-50);
+                }
+              });
+            }, 2000); // Poll every 2 seconds
+          } else {
+            setIsConnected(false);
+            setStatusMessage("Connection Error (No fallback available)");
+          }
+        }
       };
 
       ws.onmessage = (event) => {
@@ -264,6 +327,11 @@ const App: React.FC = () => {
 
       ws.onclose = () => setIsConnected(false);
       wsRef.current = ws;
+
+      // Store CoinGecko timer reference for cleanup
+      if (coinGeckoFallbackTimer) {
+        simRef.current = coinGeckoFallbackTimer;
+      }
     }
 
     return () => {
