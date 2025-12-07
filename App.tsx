@@ -260,36 +260,16 @@ const App: React.FC = () => {
 
   const handleAnalysis = useCallback(async (inds: TechnicalIndicators) => {
     if (candles.length === 0) return;
-
-    addLog(`Analysis Triggered. AI: ${enableAI}`);
     setIsAnalyzing(true);
-    // setPrediction(null); // Keep previous prediction visible while scanning? Or standard behavior.
-
     const lastPrice = candles[candles.length - 1].close;
-    try {
-      addLog("Calling Gemini API...");
-      const result = await getGeminiPrediction(
-        selectedAsset.name,
-        lastPrice,
-        inds,
-        (text) => { /* No-op or we could addLog(text) if we want stream logs */ }
-      );
-      addLog(`Result: ${result.signal} (${result.probability}%)`);
-      setPrediction(result);
-    } catch (e: any) {
-      addLog(`CRASH: ${e.message}`);
-      setPrediction({
-        probability: 0,
-        signal: SignalType.WAIT,
-        rationale: `System Error: ${e.message}`,
-        timestamp: Date.now()
-      });
-      console.error(e);
-    } finally {
-      setIsAnalyzing(false);
-      addLog("Analysis Finished");
-    }
-  }, [candles, selectedAsset.name, enableAI]);
+
+    // Reset prediction or set to loading state
+    setPrediction(null);
+
+    const result = await getGeminiPrediction(selectedAsset.name, lastPrice, inds);
+    setPrediction(result);
+    setIsAnalyzing(false);
+  }, [candles, selectedAsset.name]);
 
 
   // Track if we've already scanned for the current candle to avoid duplicates or misses
@@ -723,13 +703,7 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {/* DEBUG CONSOLE (Temporary) */}
-      <div className="fixed bottom-4 right-4 z-50 w-80 bg-black/90 text-green-400 font-mono text-[10px] p-2 rounded border border-green-500/30 font-bold opacity-80 pointer-events-none">
-        <div className="border-b border-green-500/30 mb-1 pb-1">DEBUG MONITOR</div>
-        {debugLogs.slice(-5).map((log, i) => (
-          <div key={i}>{log}</div>
-        ))}
-      </div>
+
     </div>
   );
 };
