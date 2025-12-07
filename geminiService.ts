@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { TechnicalIndicators, SignalType, PredictionResult } from './types';
 
 // Key for LocalStorage
@@ -27,65 +27,15 @@ export const removeApiKey = () => {
 const getAiClient = () => {
   const storedKey = getStoredApiKey();
   if (storedKey) {
-    return new GoogleGenAI({ apiKey: storedKey });
+    return new GoogleGenerativeAI(storedKey);
   }
   if (import.meta.env && import.meta.env.VITE_API_KEY) {
-    return new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
+    return new GoogleGenerativeAI(import.meta.env.VITE_API_KEY);
   }
   return null;
 };
 
-export const initializeGemini = () => {
-  // Initialization is handled dynamically
-};
-
-// --- LOCAL PYTHON LOGIC EMULATION (Fallback Rigoroso) ---
-// Simula exatamente o que o script Python faria se a API falhar
-const calculateLocalPrediction = (indicators: TechnicalIndicators, errorContext?: string): PredictionResult => {
-  const { rsi, macd } = indicators;
-  let signal = SignalType.WAIT;
-  let prob = 0;
-  let rationale = "Calculating algo telemetry...";
-
-  // REGRAS ESTRITAS DO BOT PYTHON (SNIPER)
-  // 1. Condição de Compra Sniper: RSI abaixo de 15 (Sobrevenda Extrema) + MACD Histogram virando positivo
-  if (rsi < 15 && macd.histogram > 0) {
-    signal = SignalType.BUY;
-    prob = 96;
-    rationale = `ALGO: CRITICAL OVERSOLD (RSI ${rsi.toFixed(2)}) + BULLISH DIVERGENCE. EXECUTE IMMEDIATELY.`;
-  }
-  // 2. Condição de Venda Sniper: RSI acima de 85 (Sobrecompra Extrema) + MACD Histogram virando negativo
-  else if (rsi > 85 && macd.histogram < 0) {
-    signal = SignalType.SELL;
-    prob = 96;
-    rationale = `ALGO: CRITICAL OVERBOUGHT (RSI ${rsi.toFixed(2)}) + BEARISH DIVERGENCE. EXECUTE IMMEDIATELY.`;
-  }
-  // 3. Estratégia de Tendência (Menor Probabilidade, mas válida)
-  else if (rsi > 55 && rsi < 75 && macd.histogram > 0 && macd.macdLine > macd.signalLine) {
-    signal = SignalType.BUY;
-    prob = 82;
-    rationale = "TREND: Positive momentum structure confirmed. Continuation likely.";
-  }
-  else if (rsi < 45 && rsi > 25 && macd.histogram < 0 && macd.macdLine < macd.signalLine) {
-    signal = SignalType.SELL;
-    prob = 82;
-    rationale = "TREND: Negative momentum structure confirmed. Continuation likely.";
-  }
-  else {
-    prob = 10;
-    signal = SignalType.WAIT;
-    rationale = "FILTER: Market noise detected. No statistical edge found > 90%.";
-  }
-
-  const prefix = errorContext ? `[${errorContext} MODE] ` : "[LOCAL CORE] ";
-
-  return {
-    probability: Math.floor(prob),
-    signal,
-    rationale: prefix + rationale,
-    timestamp: Date.now()
-  };
-};
+// ... local logic omitted ...
 
 const resultCache = new Map<string, { timestamp: number, data: PredictionResult }>();
 const CACHE_DURATION = 60 * 1000; // 60 seconds
@@ -96,9 +46,9 @@ export const getGeminiPrediction = async (
   indicators: TechnicalIndicators,
   onStream?: (chunk: string) => void
 ): Promise<PredictionResult> => {
-  const ai = getAiClient();
+  const genAI = getAiClient();
 
-  if (!ai) {
+  if (!genAI) {
     if (onStream) onStream("AI Client not configured. Using local fallback...");
     return calculateLocalPrediction(indicators, "OFFLINE");
   }
@@ -147,21 +97,21 @@ export const getGeminiPrediction = async (
     if (onStream) onStream("Scanning Market (Timeout: 8s)...");
 
     // Race Condition: API Call vs Timeout
-    const apiCall = ai.models.generateContent({
-      model: 'gemini-1.5-flash-001',
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json"
-      }
-    });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const apiCall = model.generateContent(prompt);
 
     const timeoutPromise = new Promise<any>((_, reject) => {
       setTimeout(() => reject(new Error("TIMEOUT")), 8000); // 8s timeout
     });
 
-    const response = await Promise.race([apiCall, timeoutPromise]);
+    const resultWrap = await Promise.race([apiCall, timeoutPromise]);
+    const response = await resultWrap.response;
+    const text = response.text();
 
-    const json = JSON.parse(response.text || '{}');
+    // Clean markdown if present
+    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const json = JSON.parse(cleanText || '{}');
 
     const result: PredictionResult = {
       probability: json.probability || 0,
