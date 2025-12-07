@@ -148,7 +148,7 @@ export const getGeminiPrediction = async (
     if (onStream) onStream("Scanning Market (Timeout: 8s)...");
 
     // Race Condition: API Call vs Timeout
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
 
     const apiCall = model.generateContent(prompt);
 
