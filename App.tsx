@@ -98,6 +98,8 @@ const App: React.FC = () => {
   const [activeBroker, setActiveBroker] = useState(BROKERS[0]); // Default to Binance
   const [apiKey, setApiKey] = useState("");
   const [hasKey, setHasKey] = useState(false);
+  const [forceSimulation, setForceSimulation] = useState(false);
+
 
   const [timeLeft, setTimeLeft] = useState<number>(60);
   const [searchQuery, setSearchQuery] = useState("");
@@ -156,7 +158,10 @@ const App: React.FC = () => {
     setIsConnected(false);
     setPrediction(null);
 
-    if (selectedAsset.isSimulated) {
+    // Force simulation if enabled OR if asset is natively simulated
+    const isSimulatedMode = forceSimulation || selectedAsset.isSimulated;
+
+    if (isSimulatedMode) {
       setIsConnected(true);
       let simPrice = selectedAsset.initialPrice;
       const volatility = simPrice * 0.0005;
