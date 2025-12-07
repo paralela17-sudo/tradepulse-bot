@@ -619,7 +619,7 @@ const App: React.FC = () => {
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h2 className="text-lg font-semibold text-white">AI Prediction</h2>
-                <p className="text-xs text-slate-500">Gemini 2.5 Flash • 1M TF</p>
+                <p className="text-xs text-slate-500">Gemini 1.5 Flash • 1M TF</p>
               </div>
               <div className="flex gap-2">
                 {/* Auto-Scan Toggle */}
