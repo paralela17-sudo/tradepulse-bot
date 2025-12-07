@@ -666,7 +666,11 @@ const App: React.FC = () => {
               ) : (
                 <div className="text-slate-500 flex flex-col items-center animate-pulse">
                   <RefreshCw className="w-8 h-8 mb-2 animate-spin" />
-                  <span>{statusMessage || "Scanning Market..."}</span>
+                  <span>
+                    {!isConnected ? "Connecting to Market..." :
+                      candles.length === 0 ? "Waiting for Candles..." :
+                        statusMessage || "Scanning Market..."}
+                  </span>
                 </div>
               )}
             </div>
