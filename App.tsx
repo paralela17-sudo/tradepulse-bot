@@ -485,8 +485,15 @@ const App: React.FC = () => {
               </h1>
               <p className="text-[10px] md:text-xs text-slate-500 flex items-center gap-1">
                 <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
-                {selectedAsset.isSimulated ? 'Simulation Stream' : 'Binance Live Stream'}
+                {selectedAsset.isSimulated || forceSimulation ? 'Simulation Stream' : 'Binance Live Stream'}
               </p>
+
+              <button
+                onClick={() => setForceSimulation(!forceSimulation)}
+                className={`mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all ${forceSimulation ? 'bg-purple-500/20 text-purple-400 border-purple-500' : 'bg-slate-800 text-slate-500 border-slate-700 hover:bg-slate-700'}`}
+              >
+                {forceSimulation ? 'MODE: SIMULATED' : 'MODE: LIVE'}
+              </button>
             </div>
           </div>
 
