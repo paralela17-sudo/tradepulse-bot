@@ -192,7 +192,7 @@ export const getGeminiPrediction = async (
       errorType = "API: " + errorMsg.substring(0, 50);
     }
 
-    if (onStream) onStream(`Failed: ${errorType}. Using local fallback.`);
-    return calculateLocalPrediction(indicators, errorType);
+    if (onStream) onStream(`⚠ Network/API Error. Using Local Analysis...`);
+    return calculateLocalPrediction(indicators, "OFFLINE FALLBACK");
   }
 };
