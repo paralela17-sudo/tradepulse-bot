@@ -193,6 +193,6 @@ export const getGeminiPrediction = async (
     }
 
     if (onStream) onStream(`⚠ Network/API Error. Using Local Analysis...`);
-    return calculateLocalPrediction(indicators, "OFFLINE FALLBACK");
+    return calculateLocalPrediction(indicators, `OFFLINE FALLBACK (${errorType})`);
   }
 };
