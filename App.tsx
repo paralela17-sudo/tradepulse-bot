@@ -290,468 +290,448 @@ const App: React.FC = () => {
       addLog("Analysis Finished");
     }
   }, [candles, selectedAsset.name, enableAI]);
-  timestamp: Date.now()
-});
 
-const result = await getGeminiPrediction(
-  selectedAsset.name,
-  lastPrice,
-  inds,
-  (streamedText) => {
-    // Live update the UI with the streaming rationale
-    setPrediction(prev => ({
-      probability: prev?.probability || 0,
-      signal: prev?.signal || SignalType.WAIT,
-      rationale: streamedText,
-      timestamp: Date.now()
-    }));
-  }
-);
 
-setPrediction(result);
-setIsAnalyzing(false);
-  }, [candles, selectedAsset.name]);
+  // Track if we've already scanned for the current candle to avoid duplicates or misses
+  const lastScannedTimeRef = useRef<number>(0);
 
-// Track if we've already scanned for the current candle to avoid duplicates or misses
-const lastScannedTimeRef = useRef<number>(0);
+  useEffect(() => {
+    if (candles.length < 20) return;
 
-useEffect(() => {
-  if (candles.length < 20) return;
+    const currentIndicators = analyzeMarket(candles);
+    setIndicators(currentIndicators);
 
-  const currentIndicators = analyzeMarket(candles);
-  setIndicators(currentIndicators);
+    // Auto-analyze Logic: Trigger ONCE per candle around the 35s-30s mark
+    // We use a broader window (35s to 25s) but check a ref to ensure we only do it once per minute.
+    const currentMinute = candles[candles.length - 1].time;
 
-  // Auto-analyze Logic: Trigger ONCE per candle around the 35s-30s mark
-  // We use a broader window (35s to 25s) but check a ref to ensure we only do it once per minute.
-  const currentMinute = candles[candles.length - 1].time;
+    if (enableAI && timeLeft <= 35 && timeLeft >= 25 && lastScannedTimeRef.current !== currentMinute && !isAnalyzing) {
+      console.log("Triggering Auto-Scan for", new Date(currentMinute).toISOString());
+      lastScannedTimeRef.current = currentMinute;
+      handleAnalysis(currentIndicators);
+    }
+  }, [candles.length, timeLeft, enableAI, handleAnalysis, isAnalyzing]); // dependencies updated
 
-  if (enableAI && timeLeft <= 35 && timeLeft >= 25 && lastScannedTimeRef.current !== currentMinute && !isAnalyzing) {
-    console.log("Triggering Auto-Scan for", new Date(currentMinute).toISOString());
-    lastScannedTimeRef.current = currentMinute;
-    handleAnalysis(currentIndicators);
-  }
-}, [candles.length, timeLeft, enableAI, handleAnalysis, isAnalyzing]); // dependencies updated
+  const getSignalColor = (signal: SignalType) => {
+    switch (signal) {
+      case SignalType.BUY: return 'text-green-400 border-green-500 bg-green-500/10 shadow-[0_0_20px_rgba(74,222,128,0.2)]';
+      case SignalType.SELL: return 'text-red-400 border-red-500 bg-red-500/10 shadow-[0_0_20px_rgba(248,113,113,0.2)]';
+      default: return 'text-slate-400 border-slate-600 bg-slate-800';
+    }
+  };
 
-const getSignalColor = (signal: SignalType) => {
-  switch (signal) {
-    case SignalType.BUY: return 'text-green-400 border-green-500 bg-green-500/10 shadow-[0_0_20px_rgba(74,222,128,0.2)]';
-    case SignalType.SELL: return 'text-red-400 border-red-500 bg-red-500/10 shadow-[0_0_20px_rgba(248,113,113,0.2)]';
-    default: return 'text-slate-400 border-slate-600 bg-slate-800';
-  }
-};
+  const getConfidenceColor = (prob: number) => {
+    if (prob >= 90) return 'text-green-400 drop-shadow-[0_0_10px_rgba(74,222,128,0.8)]';
+    if (prob >= 75) return 'text-green-500';
+    if (prob >= 60) return 'text-yellow-400';
+    return 'text-slate-400';
+  };
 
-const getConfidenceColor = (prob: number) => {
-  if (prob >= 90) return 'text-green-400 drop-shadow-[0_0_10px_rgba(74,222,128,0.8)]';
-  if (prob >= 75) return 'text-green-500';
-  if (prob >= 60) return 'text-yellow-400';
-  return 'text-slate-400';
-};
+  const filteredAssets = ASSETS.filter(a =>
+    a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    a.category.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-const filteredAssets = ASSETS.filter(a =>
-  a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-  a.category.toLowerCase().includes(searchQuery.toLowerCase())
-);
+  const isHighProb = prediction && prediction.probability >= 90 && (prediction.signal === 'BUY' || prediction.signal === 'SELL');
 
-const isHighProb = prediction && prediction.probability >= 90 && (prediction.signal === 'BUY' || prediction.signal === 'SELL');
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-cyan-500/30 pb-20 md:pb-0">
 
-return (
-  <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-cyan-500/30 pb-20 md:pb-0">
-
-    {/* --- HIGH PROBABILITY ALERT OVERLAY --- */}
-    {isHighProb && timeLeft < 40 && timeLeft > 5 && (
-      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-green-900/20 backdrop-blur-sm animate-pulse pointer-events-none px-4">
-        <div className="bg-slate-900/90 border-2 border-green-500 p-6 md:p-8 rounded-3xl shadow-[0_0_50px_rgba(34,197,94,0.5)] flex flex-col items-center animate-bounce-slow text-center max-w-sm md:max-w-md w-full">
-          <Siren className="w-12 h-12 md:w-16 md:h-16 text-green-400 mb-4 animate-spin-slow" />
-          <h1 className="text-2xl md:text-4xl font-black text-white uppercase tracking-tighter mb-2">
-            OPPORTUNITY DETECTED
-          </h1>
-          <div className="flex items-center gap-4 mt-2">
-            <span className={`text-3xl md:text-5xl font-bold ${prediction?.signal === 'BUY' ? 'text-green-400' : 'text-red-500'}`}>
-              {prediction?.signal} NOW
-            </span>
-            <div className="h-8 md:h-12 w-[2px] bg-slate-600"></div>
-            <div className="flex flex-col items-center">
-              <span className="text-xs md:text-sm text-slate-400 uppercase">Time Left</span>
-              <span className="text-2xl md:text-4xl font-mono font-bold text-white">{timeLeft}s</span>
-            </div>
-          </div>
-          <p className="mt-4 text-slate-300 text-sm md:text-base font-medium bg-slate-800 px-4 py-2 rounded-lg">
-            {prediction?.rationale}
-          </p>
-        </div>
-      </div>
-    )}
-
-    {/* Settings Modal */}
-    {showSettings && (
-      <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full mx-auto shadow-2xl">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-              <Settings className="w-6 h-6 text-cyan-400" /> Settings
-            </h3>
-            <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-white">
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-slate-400 mb-2">Gemini API Key</label>
-            <div className="relative">
-              <Key className="absolute left-3 top-3 w-5 h-5 text-slate-500" />
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="Enter your Google Gemini API Key"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-cyan-500 transition-colors"
-              />
-            </div>
-            <p className="text-xs text-slate-500 mt-2">
-              Your key is stored locally in your browser. It is never sent to our servers.
-            </p>
-          </div>
-
-          <div className="flex gap-3">
-            {hasKey && (
-              <button
-                onClick={handleRemoveKey}
-                className="flex-1 bg-red-500/10 text-red-400 hover:bg-red-500/20 py-3 rounded-xl font-medium transition-colors"
-              >
-                Clear Key
-              </button>
-            )}
-            <button
-              onClick={handleSaveKey}
-              className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white py-3 rounded-xl font-bold transition-colors"
-            >
-              Save & Connect
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
-
-    {/* Broker Selection Modal */}
-    {showBrokerModal && (
-      <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full mx-auto shadow-2xl flex flex-col max-h-[90vh]">
-          <div className="flex justify-between items-center mb-4 shrink-0">
-            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-              <Globe className="w-6 h-6 text-cyan-400" /> Select Target Broker
-            </h3>
-            <button onClick={() => setShowBrokerModal(false)} className="text-slate-400 hover:text-white">
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-
-          <p className="text-sm text-slate-400 mb-6 shrink-0">
-            Select the broker you are manually trading on. TradePulse will analyze market data (via Binance/OTC) and generate signals optimized for your platform's timeframe.
-          </p>
-
-          <div className="space-y-3 overflow-y-auto scrollbar-thin">
-            {BROKERS.map(broker => (
-              <button
-                key={broker.id}
-                onClick={() => handleBrokerSelect(broker)}
-                className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${activeBroker.id === broker.id
-                  ? 'bg-cyan-500/10 border-cyan-500'
-                  : 'bg-slate-950 border-slate-800 hover:bg-slate-800 hover:border-slate-700'
-                  }`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-slate-900 font-bold ${broker.color}`}>
-                    {broker.name.substring(0, 2)}
-                  </div>
-                  <div className="text-left">
-                    <div className={`font-bold ${activeBroker.id === broker.id ? 'text-white' : 'text-slate-300'}`}>
-                      {broker.name}
-                    </div>
-                    <div className="text-xs text-slate-500 uppercase tracking-wide">
-                      {broker.type}
-                    </div>
-                  </div>
-                </div>
-                {activeBroker.id === broker.id && (
-                  <CheckCircle2 className="w-6 h-6 text-cyan-500" />
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    )}
-
-    {/* Header */}
-    <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 py-3 md:py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2 md:gap-3">
-          <div className="bg-cyan-500/20 p-2 rounded-lg">
-            <Activity className="w-5 h-5 md:w-6 md:h-6 text-cyan-400" />
-          </div>
-          <div>
-            <h1 className="text-lg md:text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-              TradePulse AI
+      {/* --- HIGH PROBABILITY ALERT OVERLAY --- */}
+      {isHighProb && timeLeft < 40 && timeLeft > 5 && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-green-900/20 backdrop-blur-sm animate-pulse pointer-events-none px-4">
+          <div className="bg-slate-900/90 border-2 border-green-500 p-6 md:p-8 rounded-3xl shadow-[0_0_50px_rgba(34,197,94,0.5)] flex flex-col items-center animate-bounce-slow text-center max-w-sm md:max-w-md w-full">
+            <Siren className="w-12 h-12 md:w-16 md:h-16 text-green-400 mb-4 animate-spin-slow" />
+            <h1 className="text-2xl md:text-4xl font-black text-white uppercase tracking-tighter mb-2">
+              OPPORTUNITY DETECTED
             </h1>
-            <p className="text-[10px] md:text-xs text-slate-500 flex items-center gap-1">
-              <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
-              {selectedAsset.isSimulated ? 'Simulation Stream' : 'Binance Live Stream'}
+            <div className="flex items-center gap-4 mt-2">
+              <span className={`text-3xl md:text-5xl font-bold ${prediction?.signal === 'BUY' ? 'text-green-400' : 'text-red-500'}`}>
+                {prediction?.signal} NOW
+              </span>
+              <div className="h-8 md:h-12 w-[2px] bg-slate-600"></div>
+              <div className="flex flex-col items-center">
+                <span className="text-xs md:text-sm text-slate-400 uppercase">Time Left</span>
+                <span className="text-2xl md:text-4xl font-mono font-bold text-white">{timeLeft}s</span>
+              </div>
+            </div>
+            <p className="mt-4 text-slate-300 text-sm md:text-base font-medium bg-slate-800 px-4 py-2 rounded-lg">
+              {prediction?.rationale}
             </p>
           </div>
         </div>
+      )}
 
-        <div className="flex items-center gap-2 md:gap-4">
-          <div className="hidden md:flex flex-col items-end mr-4">
-            <span className="text-xs text-slate-400">Target Broker</span>
-            <span className={`text-sm font-bold ${activeBroker.color}`}>{activeBroker.name}</span>
-          </div>
-
-          {/* Settings Button */}
-          <button
-            onClick={() => setShowSettings(true)}
-            className={`p-2 rounded-lg transition-colors border ${hasKey ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white' : 'bg-yellow-500/10 border-yellow-500/50 text-yellow-500 animate-pulse'}`}
-          >
-            <Settings className="w-5 h-5" />
-          </button>
-
-          <button
-            onClick={() => setShowBrokerModal(true)}
-            className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-colors flex items-center gap-2"
-          >
-            <Lock className="w-3 h-3 md:w-4 md:h-4" /> <span className="hidden md:inline">Connect Broker</span><span className="md:hidden">Broker</span>
-          </button>
-        </div>
-      </div>
-    </header>
-
-    <main className="max-w-7xl mx-auto px-4 py-4 md:py-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-      {/* Left Column: Chart & Controls */}
-      <div className="lg:col-span-2 space-y-4 md:space-y-6">
-
-        {/* Asset Selector */}
-        <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between mb-3 gap-3">
-            <h3 className="text-sm font-medium text-slate-400 flex items-center gap-2">
-              <BarChart3 className="w-4 h-4" /> Market Selector
-            </h3>
-            <input
-              type="text"
-              placeholder="Search asset..."
-              className="w-full md:w-auto bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 md:py-1 text-sm md:text-xs focus:outline-none focus:border-cyan-500"
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin -mx-4 px-4 md:mx-0 md:px-0">
-            {['Crypto', 'OTC', 'Stocks', 'Forex', 'Commodities'].map(cat => (
-              <div key={cat} className="flex-shrink-0">
-                <span className="text-xs font-bold text-slate-500 uppercase px-2 mb-1 block">{cat}</span>
-                <div className="flex gap-2">
-                  {filteredAssets.filter(a => a.category === cat).map(asset => (
-                    <button
-                      key={asset.symbol}
-                      onClick={() => setSelectedAsset(asset)}
-                      className={`flex flex-col min-w-[100px] p-2 rounded-lg border transition-all ${selectedAsset.symbol === asset.symbol
-                        ? 'bg-cyan-500/10 border-cyan-500/50'
-                        : 'bg-slate-800 border-slate-700 hover:border-slate-600'
-                        }`}
-                    >
-                      <div className="flex justify-between items-center w-full mb-1">
-                        <span className={`text-xs font-bold ${selectedAsset.symbol === asset.symbol ? 'text-cyan-400' : 'text-slate-300'}`}>
-                          {asset.name}
-                        </span>
-                        {asset.isHot && <Flame className="w-3 h-3 text-orange-500 fill-orange-500 animate-pulse" />}
-                      </div>
-                      <div className="flex justify-between items-center w-full">
-                        <span className="text-[10px] text-slate-500">{asset.category}</span>
-                        <span className="text-[10px] font-bold text-green-400">{asset.profit}%</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Main Chart */}
-        <div className="relative group bg-slate-900 rounded-xl border border-slate-800 p-1">
-          <div className="absolute top-4 left-4 z-10 bg-slate-900/80 backdrop-blur px-3 py-1 rounded-lg border border-slate-700">
-            <span className="text-2xl md:text-3xl font-bold text-white tracking-tight mr-2">
-              ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
-            </span>
-            <span className="text-xs text-green-400 font-mono block md:inline">
-              Payout: {selectedAsset.profit}%
-            </span>
-          </div>
-          {/* Chart is its own component so we just wrap it */}
-          <div className="h-[300px] md:h-64 w-full pt-16 md:pt-0">
-            <Chart data={candles} color={currentPrice > (candles[0]?.close || 0) ? '#10b981' : '#ef4444'} />
-          </div>
-        </div>
-
-        {/* Technical Grid */}
-        <div className="grid grid-cols-3 gap-2 md:gap-4">
-          <div className="bg-slate-900 rounded-xl p-3 md:p-4 border border-slate-800">
-            <span className="text-[10px] md:text-xs text-slate-500 uppercase tracking-wider">RSI (14)</span>
-            <div className="text-lg md:text-2xl font-bold mt-1 text-slate-200">
-              {indicators?.rsi.toFixed(2) || '--'}
-            </div>
-            <div className="h-1.5 w-full bg-slate-800 rounded-full mt-2 overflow-hidden">
-              <div
-                className={`h-full ${indicators?.rsi && indicators.rsi > 70 ? 'bg-red-500' : indicators?.rsi && indicators.rsi < 30 ? 'bg-green-500' : 'bg-blue-500'}`}
-                style={{ width: `${indicators?.rsi || 0}%` }}
-              ></div>
-            </div>
-          </div>
-          <div className="bg-slate-900 rounded-xl p-3 md:p-4 border border-slate-800">
-            <span className="text-[10px] md:text-xs text-slate-500 uppercase tracking-wider">MACD Hist</span>
-            <div className={`text-lg md:text-2xl font-bold mt-1 ${indicators?.macd.histogram && indicators.macd.histogram > 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {indicators?.macd.histogram.toFixed(5) || '--'}
-            </div>
-            <span className="text-[10px] md:text-xs text-slate-600 block truncate">Trend Strength</span>
-          </div>
-          <div className="bg-slate-900 rounded-xl p-3 md:p-4 border border-slate-800">
-            <span className="text-[10px] md:text-xs text-slate-500 uppercase tracking-wider">Entry Window</span>
-            <div className="text-lg md:text-2xl font-mono font-bold mt-1 text-cyan-400 flex items-center gap-2">
-              <Timer className="w-4 h-4 md:w-5 md:h-5" /> {timeLeft}s
-            </div>
-            <span className="text-[10px] md:text-xs text-slate-600 block truncate">Until Next Candle</span>
-          </div>
-        </div>
-
-        {/* Disclaimer */}
-        <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-lg p-3 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
-          <p className="text-xs text-yellow-500/80">
-            <strong>Active Mode: {activeBroker.name} ({activeBroker.type})</strong><br />
-            Using Binance WebSocket data as a proxy. Prices on {activeBroker.name} may vary.
-          </p>
-        </div>
-      </div>
-
-      {/* Right Column: AI Predictions & Actions */}
-      <div className="space-y-4 md:space-y-6">
-
-        {/* Signal Card */}
-        <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 shadow-xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl -mr-10 -mt-10"></div>
-
-          <div className="flex justify-between items-start mb-6">
-            <div>
-              <h2 className="text-lg font-semibold text-white">AI Prediction</h2>
-              <p className="text-xs text-slate-500">Gemini 1.5 Flash • 1M TF</p>
-            </div>
-            <div className="flex gap-2">
-              {/* Auto-Scan Toggle */}
-              <button
-                onClick={() => setEnableAI(!enableAI)}
-                className={`p-2 rounded-lg transition-colors ${enableAI ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-800 text-slate-600'}`}
-                title={enableAI ? "Disable Auto-Scan (Save Quota)" : "Enable Auto-Scan"}
-              >
-                <Power className="w-5 h-5" />
-              </button>
-              {/* Manual Scan */}
-              <button
-                onClick={() => indicators && handleAnalysis(indicators)}
-                disabled={isAnalyzing}
-                className="bg-slate-800 p-2 rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50"
-                title="Scan Now"
-              >
-                <ScanEye className={`w-5 h-5 text-yellow-400 ${isAnalyzing ? 'animate-spin' : ''}`} />
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full mx-auto shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <Settings className="w-6 h-6 text-cyan-400" /> Settings
+              </h3>
+              <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-white">
+                <X className="w-6 h-6" />
               </button>
             </div>
-          </div>
 
-          <div className="flex flex-col items-center justify-center py-6">
-            {prediction ? (
-              <>
-                <div className={`text-4xl md:text-5xl font-black tracking-tighter mb-2 transition-all duration-500 ${getConfidenceColor(prediction.probability)} ${prediction.probability > 90 ? 'scale-110 animate-pulse' : ''}`}>
-                  {prediction.probability}%
-                </div>
-                <span className="text-sm text-slate-400 uppercase tracking-widest font-medium">Win Probability</span>
-
-                <div className={`mt-6 px-6 py-2 rounded-full border-2 font-bold text-xl flex items-center gap-2 transition-all duration-300 ${getSignalColor(prediction.signal)}`}>
-                  {prediction.signal === SignalType.BUY && <TrendingUp className="w-5 h-5" />}
-                  {prediction.signal === SignalType.SELL && <TrendingDown className="w-5 h-5" />}
-                  {prediction.signal === SignalType.WAIT && <Pause className="w-5 h-5" />}
-                  {prediction.signal}
-                </div>
-
-                {prediction.probability > 90 && (
-                  <div className="mt-4 flex items-center gap-2 text-green-400 animate-bounce">
-                    <Siren className="w-5 h-5" />
-                    <span className="text-xs font-bold uppercase tracking-wider">SNIPER SIGNAL</span>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="text-slate-500 flex flex-col items-center animate-pulse">
-                <RefreshCw className="w-8 h-8 mb-2 animate-spin" />
-                <span>Scanning Market...</span>
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-slate-400 mb-2">Gemini API Key</label>
+              <div className="relative">
+                <Key className="absolute left-3 top-3 w-5 h-5 text-slate-500" />
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="Enter your Google Gemini API Key"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-cyan-500 transition-colors"
+                />
               </div>
-            )}
-          </div>
-
-          {prediction && (
-            <div className="mt-6 p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
-              <p className="text-sm text-slate-300 italic">
-                "{prediction.rationale}"
+              <p className="text-xs text-slate-500 mt-2">
+                Your key is stored locally in your browser. It is never sent to our servers.
               </p>
             </div>
-          )}
-        </div>
 
-        {/* Manual Trade Actions */}
-        <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Manual Entry</h3>
-            <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded border border-green-500/30">
-              Target: {selectedAsset.name}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <button
-              disabled={!prediction}
-              className="bg-green-600 hover:bg-green-500 active:scale-95 transition-all py-4 rounded-xl flex flex-col items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed group"
-            >
-              <TrendingUp className="w-6 h-6 text-white mb-1 group-hover:-translate-y-1 transition-transform" />
-              <span className="font-bold text-white">CALL (UP)</span>
-            </button>
-            <button
-              disabled={!prediction}
-              className="bg-red-600 hover:bg-red-500 active:scale-95 transition-all py-4 rounded-xl flex flex-col items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed group"
-            >
-              <TrendingDown className="w-6 h-6 text-white mb-1 group-hover:translate-y-1 transition-transform" />
-              <span className="font-bold text-white">PUT (DOWN)</span>
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg border border-slate-700">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-6 rounded-full p-1 cursor-pointer transition-colors ${autoTrade ? 'bg-cyan-500' : 'bg-slate-600'}`} onClick={() => setAutoTrade(!autoTrade)}>
-                <div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform ${autoTrade ? 'translate-x-4' : ''}`}></div>
-              </div>
-              <span className="text-sm font-medium text-slate-300">Copy Trading Bot</span>
+            <div className="flex gap-3">
+              {hasKey && (
+                <button
+                  onClick={handleRemoveKey}
+                  className="flex-1 bg-red-500/10 text-red-400 hover:bg-red-500/20 py-3 rounded-xl font-medium transition-colors"
+                >
+                  Clear Key
+                </button>
+              )}
+              <button
+                onClick={handleSaveKey}
+                className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white py-3 rounded-xl font-bold transition-colors"
+              >
+                Save & Connect
+              </button>
             </div>
-            {autoTrade ? <Play className="w-4 h-4 text-cyan-400" /> : <Pause className="w-4 h-4 text-slate-500" />}
+          </div>
+        </div>
+      )}
+
+      {/* Broker Selection Modal */}
+      {showBrokerModal && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full mx-auto shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center mb-4 shrink-0">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <Globe className="w-6 h-6 text-cyan-400" /> Select Target Broker
+              </h3>
+              <button onClick={() => setShowBrokerModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <p className="text-sm text-slate-400 mb-6 shrink-0">
+              Select the broker you are manually trading on. TradePulse will analyze market data (via Binance/OTC) and generate signals optimized for your platform's timeframe.
+            </p>
+
+            <div className="space-y-3 overflow-y-auto scrollbar-thin">
+              {BROKERS.map(broker => (
+                <button
+                  key={broker.id}
+                  onClick={() => handleBrokerSelect(broker)}
+                  className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${activeBroker.id === broker.id
+                    ? 'bg-cyan-500/10 border-cyan-500'
+                    : 'bg-slate-950 border-slate-800 hover:bg-slate-800 hover:border-slate-700'
+                    }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-slate-900 font-bold ${broker.color}`}>
+                      {broker.name.substring(0, 2)}
+                    </div>
+                    <div className="text-left">
+                      <div className={`font-bold ${activeBroker.id === broker.id ? 'text-white' : 'text-slate-300'}`}>
+                        {broker.name}
+                      </div>
+                      <div className="text-xs text-slate-500 uppercase tracking-wide">
+                        {broker.type}
+                      </div>
+                    </div>
+                  </div>
+                  {activeBroker.id === broker.id && (
+                    <CheckCircle2 className="w-6 h-6 text-cyan-500" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 py-3 md:py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 md:gap-3">
+            <div className="bg-cyan-500/20 p-2 rounded-lg">
+              <Activity className="w-5 h-5 md:w-6 md:h-6 text-cyan-400" />
+            </div>
+            <div>
+              <h1 className="text-lg md:text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+                TradePulse AI
+              </h1>
+              <p className="text-[10px] md:text-xs text-slate-500 flex items-center gap-1">
+                <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
+                {selectedAsset.isSimulated ? 'Simulation Stream' : 'Binance Live Stream'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 md:gap-4">
+            <div className="hidden md:flex flex-col items-end mr-4">
+              <span className="text-xs text-slate-400">Target Broker</span>
+              <span className={`text-sm font-bold ${activeBroker.color}`}>{activeBroker.name}</span>
+            </div>
+
+            {/* Settings Button */}
+            <button
+              onClick={() => setShowSettings(true)}
+              className={`p-2 rounded-lg transition-colors border ${hasKey ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white' : 'bg-yellow-500/10 border-yellow-500/50 text-yellow-500 animate-pulse'}`}
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+
+            <button
+              onClick={() => setShowBrokerModal(true)}
+              className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-colors flex items-center gap-2"
+            >
+              <Lock className="w-3 h-3 md:w-4 md:h-4" /> <span className="hidden md:inline">Connect Broker</span><span className="md:hidden">Broker</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 py-4 md:py-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {/* Left Column: Chart & Controls */}
+        <div className="lg:col-span-2 space-y-4 md:space-y-6">
+
+          {/* Asset Selector */}
+          <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-3 gap-3">
+              <h3 className="text-sm font-medium text-slate-400 flex items-center gap-2">
+                <BarChart3 className="w-4 h-4" /> Market Selector
+              </h3>
+              <input
+                type="text"
+                placeholder="Search asset..."
+                className="w-full md:w-auto bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 md:py-1 text-sm md:text-xs focus:outline-none focus:border-cyan-500"
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin -mx-4 px-4 md:mx-0 md:px-0">
+              {['Crypto', 'OTC', 'Stocks', 'Forex', 'Commodities'].map(cat => (
+                <div key={cat} className="flex-shrink-0">
+                  <span className="text-xs font-bold text-slate-500 uppercase px-2 mb-1 block">{cat}</span>
+                  <div className="flex gap-2">
+                    {filteredAssets.filter(a => a.category === cat).map(asset => (
+                      <button
+                        key={asset.symbol}
+                        onClick={() => setSelectedAsset(asset)}
+                        className={`flex flex-col min-w-[100px] p-2 rounded-lg border transition-all ${selectedAsset.symbol === asset.symbol
+                          ? 'bg-cyan-500/10 border-cyan-500/50'
+                          : 'bg-slate-800 border-slate-700 hover:border-slate-600'
+                          }`}
+                      >
+                        <div className="flex justify-between items-center w-full mb-1">
+                          <span className={`text-xs font-bold ${selectedAsset.symbol === asset.symbol ? 'text-cyan-400' : 'text-slate-300'}`}>
+                            {asset.name}
+                          </span>
+                          {asset.isHot && <Flame className="w-3 h-3 text-orange-500 fill-orange-500 animate-pulse" />}
+                        </div>
+                        <div className="flex justify-between items-center w-full">
+                          <span className="text-[10px] text-slate-500">{asset.category}</span>
+                          <span className="text-[10px] font-bold text-green-400">{asset.profit}%</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Main Chart */}
+          <div className="relative group bg-slate-900 rounded-xl border border-slate-800 p-1">
+            <div className="absolute top-4 left-4 z-10 bg-slate-900/80 backdrop-blur px-3 py-1 rounded-lg border border-slate-700">
+              <span className="text-2xl md:text-3xl font-bold text-white tracking-tight mr-2">
+                ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+              </span>
+              <span className="text-xs text-green-400 font-mono block md:inline">
+                Payout: {selectedAsset.profit}%
+              </span>
+            </div>
+            {/* Chart is its own component so we just wrap it */}
+            <div className="h-[300px] md:h-64 w-full pt-16 md:pt-0">
+              <Chart data={candles} color={currentPrice > (candles[0]?.close || 0) ? '#10b981' : '#ef4444'} />
+            </div>
+          </div>
+
+          {/* Technical Grid */}
+          <div className="grid grid-cols-3 gap-2 md:gap-4">
+            <div className="bg-slate-900 rounded-xl p-3 md:p-4 border border-slate-800">
+              <span className="text-[10px] md:text-xs text-slate-500 uppercase tracking-wider">RSI (14)</span>
+              <div className="text-lg md:text-2xl font-bold mt-1 text-slate-200">
+                {indicators?.rsi.toFixed(2) || '--'}
+              </div>
+              <div className="h-1.5 w-full bg-slate-800 rounded-full mt-2 overflow-hidden">
+                <div
+                  className={`h-full ${indicators?.rsi && indicators.rsi > 70 ? 'bg-red-500' : indicators?.rsi && indicators.rsi < 30 ? 'bg-green-500' : 'bg-blue-500'}`}
+                  style={{ width: `${indicators?.rsi || 0}%` }}
+                ></div>
+              </div>
+            </div>
+            <div className="bg-slate-900 rounded-xl p-3 md:p-4 border border-slate-800">
+              <span className="text-[10px] md:text-xs text-slate-500 uppercase tracking-wider">MACD Hist</span>
+              <div className={`text-lg md:text-2xl font-bold mt-1 ${indicators?.macd.histogram && indicators.macd.histogram > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {indicators?.macd.histogram.toFixed(5) || '--'}
+              </div>
+              <span className="text-[10px] md:text-xs text-slate-600 block truncate">Trend Strength</span>
+            </div>
+            <div className="bg-slate-900 rounded-xl p-3 md:p-4 border border-slate-800">
+              <span className="text-[10px] md:text-xs text-slate-500 uppercase tracking-wider">Entry Window</span>
+              <div className="text-lg md:text-2xl font-mono font-bold mt-1 text-cyan-400 flex items-center gap-2">
+                <Timer className="w-4 h-4 md:w-5 md:h-5" /> {timeLeft}s
+              </div>
+              <span className="text-[10px] md:text-xs text-slate-600 block truncate">Until Next Candle</span>
+            </div>
+          </div>
+
+          {/* Disclaimer */}
+          <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-lg p-3 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-yellow-500/80">
+              <strong>Active Mode: {activeBroker.name} ({activeBroker.type})</strong><br />
+              Using Binance WebSocket data as a proxy. Prices on {activeBroker.name} may vary.
+            </p>
           </div>
         </div>
 
-      </div>
-    </main>
+        {/* Right Column: AI Predictions & Actions */}
+        <div className="space-y-4 md:space-y-6">
 
-    {/* DEBUG CONSOLE (Temporary) */}
-    <div className="fixed bottom-4 right-4 z-50 w-80 bg-black/90 text-green-400 font-mono text-[10px] p-2 rounded border border-green-500/30 font-bold opacity-80 pointer-events-none">
-      <div className="border-b border-green-500/30 mb-1 pb-1">DEBUG MONITOR</div>
-      {debugLogs.slice(-5).map((log, i) => (
-        <div key={i}>{log}</div>
-      ))}
+          {/* Signal Card */}
+          <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl -mr-10 -mt-10"></div>
+
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h2 className="text-lg font-semibold text-white">AI Prediction</h2>
+                <p className="text-xs text-slate-500">Gemini 1.5 Flash • 1M TF</p>
+              </div>
+              <div className="flex gap-2">
+                {/* Auto-Scan Toggle */}
+                <button
+                  onClick={() => setEnableAI(!enableAI)}
+                  className={`p-2 rounded-lg transition-colors ${enableAI ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-800 text-slate-600'}`}
+                  title={enableAI ? "Disable Auto-Scan (Save Quota)" : "Enable Auto-Scan"}
+                >
+                  <Power className="w-5 h-5" />
+                </button>
+                {/* Manual Scan */}
+                <button
+                  onClick={() => indicators && handleAnalysis(indicators)}
+                  disabled={isAnalyzing}
+                  className="bg-slate-800 p-2 rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50"
+                  title="Scan Now"
+                >
+                  <ScanEye className={`w-5 h-5 text-yellow-400 ${isAnalyzing ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center justify-center py-6">
+              {prediction ? (
+                <>
+                  <div className={`text-4xl md:text-5xl font-black tracking-tighter mb-2 transition-all duration-500 ${getConfidenceColor(prediction.probability)} ${prediction.probability > 90 ? 'scale-110 animate-pulse' : ''}`}>
+                    {prediction.probability}%
+                  </div>
+                  <span className="text-sm text-slate-400 uppercase tracking-widest font-medium">Win Probability</span>
+
+                  <div className={`mt-6 px-6 py-2 rounded-full border-2 font-bold text-xl flex items-center gap-2 transition-all duration-300 ${getSignalColor(prediction.signal)}`}>
+                    {prediction.signal === SignalType.BUY && <TrendingUp className="w-5 h-5" />}
+                    {prediction.signal === SignalType.SELL && <TrendingDown className="w-5 h-5" />}
+                    {prediction.signal === SignalType.WAIT && <Pause className="w-5 h-5" />}
+                    {prediction.signal}
+                  </div>
+
+                  {prediction.probability > 90 && (
+                    <div className="mt-4 flex items-center gap-2 text-green-400 animate-bounce">
+                      <Siren className="w-5 h-5" />
+                      <span className="text-xs font-bold uppercase tracking-wider">SNIPER SIGNAL</span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-slate-500 flex flex-col items-center animate-pulse">
+                  <RefreshCw className="w-8 h-8 mb-2 animate-spin" />
+                  <span>Scanning Market...</span>
+                </div>
+              )}
+            </div>
+
+            {prediction && (
+              <div className="mt-6 p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                <p className="text-sm text-slate-300 italic">
+                  "{prediction.rationale}"
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Manual Trade Actions */}
+          <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Manual Entry</h3>
+              <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded border border-green-500/30">
+                Target: {selectedAsset.name}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <button
+                disabled={!prediction}
+                className="bg-green-600 hover:bg-green-500 active:scale-95 transition-all py-4 rounded-xl flex flex-col items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed group"
+              >
+                <TrendingUp className="w-6 h-6 text-white mb-1 group-hover:-translate-y-1 transition-transform" />
+                <span className="font-bold text-white">CALL (UP)</span>
+              </button>
+              <button
+                disabled={!prediction}
+                className="bg-red-600 hover:bg-red-500 active:scale-95 transition-all py-4 rounded-xl flex flex-col items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed group"
+              >
+                <TrendingDown className="w-6 h-6 text-white mb-1 group-hover:translate-y-1 transition-transform" />
+                <span className="font-bold text-white">PUT (DOWN)</span>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg border border-slate-700">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-6 rounded-full p-1 cursor-pointer transition-colors ${autoTrade ? 'bg-cyan-500' : 'bg-slate-600'}`} onClick={() => setAutoTrade(!autoTrade)}>
+                  <div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform ${autoTrade ? 'translate-x-4' : ''}`}></div>
+                </div>
+                <span className="text-sm font-medium text-slate-300">Copy Trading Bot</span>
+              </div>
+              {autoTrade ? <Play className="w-4 h-4 text-cyan-400" /> : <Pause className="w-4 h-4 text-slate-500" />}
+            </div>
+          </div>
+
+        </div>
+      </main>
+
+      {/* DEBUG CONSOLE (Temporary) */}
+      <div className="fixed bottom-4 right-4 z-50 w-80 bg-black/90 text-green-400 font-mono text-[10px] p-2 rounded border border-green-500/30 font-bold opacity-80 pointer-events-none">
+        <div className="border-b border-green-500/30 mb-1 pb-1">DEBUG MONITOR</div>
+        {debugLogs.slice(-5).map((log, i) => (
+          <div key={i}>{log}</div>
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
 };
 
 export default App;
