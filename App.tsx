@@ -81,6 +81,7 @@ const BROKERS = [
 ];
 
 const App: React.FC = () => {
+  const [statusMessage, setStatusMessage] = useState<string>("");
   const [selectedAsset, setSelectedAsset] = useState<Asset>(ASSETS[0]);
   const [candles, setCandles] = useState<Candle[]>([]);
   const [currentPrice, setCurrentPrice] = useState<number>(0);
@@ -260,15 +261,31 @@ const App: React.FC = () => {
 
   const handleAnalysis = useCallback(async (inds: TechnicalIndicators) => {
     if (candles.length === 0) return;
-    setIsAnalyzing(true);
-    const lastPrice = candles[candles.length - 1].close;
 
-    // Reset prediction or set to loading state
+    setIsAnalyzing(true);
+    setStatusMessage("Initializing...");
     setPrediction(null);
 
-    const result = await getGeminiPrediction(selectedAsset.name, lastPrice, inds);
-    setPrediction(result);
-    setIsAnalyzing(false);
+    try {
+      const lastPrice = candles[candles.length - 1].close;
+      setStatusMessage("Analyzing Market Data...");
+
+      const result = await getGeminiPrediction(selectedAsset.name, lastPrice, inds);
+
+      setStatusMessage("Processing Result...");
+      setPrediction(result);
+    } catch (error: any) {
+      console.error("Analysis Failed:", error);
+      setStatusMessage(`Error: ${error.message || "Unknown Failure"}`);
+      setPrediction({
+        probability: 0,
+        signal: SignalType.WAIT,
+        rationale: `System Error: ${error.message}. retrying...`,
+        timestamp: Date.now()
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
   }, [candles, selectedAsset.name]);
 
 
