@@ -649,7 +649,7 @@ const App: React.FC = () => {
               ) : (
                 <div className="text-slate-500 flex flex-col items-center animate-pulse">
                   <RefreshCw className="w-8 h-8 mb-2 animate-spin" />
-                  <span>Scanning Market...</span>
+                  <span>{statusMessage || "Scanning Market..."}</span>
                 </div>
               )}
             </div>
