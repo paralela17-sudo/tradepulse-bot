@@ -214,10 +214,18 @@ const App: React.FC = () => {
       }, 1000);
 
     } else {
-      const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${selectedAsset.symbol}@kline_1m`);
+      // Use standard port 443 (implicit) for better firewall compatibility
+      const ws = new WebSocket(`wss://stream.binance.com/ws/${selectedAsset.symbol}@kline_1m`);
 
       ws.onopen = () => {
         setIsConnected(true);
+        setStatusMessage(""); // Clear "Connecting..." message
+      };
+
+      ws.onerror = (e) => {
+        console.error("Binance WS Error:", e);
+        setIsConnected(false);
+        setStatusMessage("Connection Error (Binance)");
       };
 
       ws.onmessage = (event) => {
