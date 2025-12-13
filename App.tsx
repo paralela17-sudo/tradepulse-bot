@@ -4,7 +4,7 @@ import { Chart } from './Chart';
 import { Candle, TechnicalIndicators, PredictionResult, SignalType, Asset } from './types';
 import { analyzeMarket } from './indicators';
 import { getGeminiPrediction, initializeGemini, saveApiKey, getStoredApiKey, removeApiKey } from './geminiService';
-import { getCoinGeckoId, startCoinGeckoPricePolling } from './coinGeckoService';
+import { marketDataService, DataProvider } from './marketDataService';
 import { OpportunityPanel } from './OpportunityPanel';
 import { scanAllAssets } from './scannerService';
 
@@ -99,6 +99,7 @@ const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [showBrokerModal, setShowBrokerModal] = useState(false);
   const [activeBroker, setActiveBroker] = useState(BROKERS[0]); // Default to Binance
+  const [activeProvider, setActiveProvider] = useState<DataProvider>('BINANCE');
   const [apiKey, setApiKey] = useState("");
   const [hasKey, setHasKey] = useState(false);
   const [forceSimulation, setForceSimulation] = useState(false);
@@ -265,117 +266,12 @@ const App: React.FC = () => {
       }, 1000);
 
     } else {
-      // Try Binance WebSocket first
-      console.log(`[DEBUG] Attempting Binance WebSocket for ${selectedAsset.symbol}`);
-      const ws = new WebSocket(`wss://stream.binance.com/ws/${selectedAsset.symbol}@kline_1m`);
-      let wsConnected = false;
-      let coinGeckoFallbackTimer: ReturnType<typeof setInterval> | null = null;
-      let fallbackActivated = false;
+      // --- MARKET DATA SERVICE (Multi-Provider) ---
+      console.log(`[App] Initializing connection for ${selectedAsset.symbol}`);
 
-      ws.onopen = () => {
-        console.log(`[DEBUG] ✅ Binance WebSocket connected for ${selectedAsset.symbol}`);
-        wsConnected = true;
-        setIsConnected(true);
-        setStatusMessage("");
-      };
-
-      const activateCoinGeckoFallback = () => {
-        if (fallbackActivated) {
-          console.log(`[DEBUG] ⚠️ Fallback already activated, skipping`);
-          return;
-        }
-
-        const coinId = getCoinGeckoId(selectedAsset.symbol);
-        if (coinId) {
-          console.log(`[DEBUG] 🔄 Activating CoinGecko fallback for ${selectedAsset.name} (coinId: ${coinId})`);
-          fallbackActivated = true;
-          setStatusMessage("🌐 Using CoinGecko API (Binance unavailable)");
-          setIsConnected(true);
-
-          // Initialize with current price
-          let lastPrice = selectedAsset.initialPrice;
-          const now = Date.now();
-          const initialCandles: Candle[] = [];
-
-          for (let i = 50; i > 0; i--) {
-            initialCandles.push({
-              time: now - (i * 60000),
-              open: lastPrice,
-              high: lastPrice * 1.001,
-              low: lastPrice * 0.999,
-              close: lastPrice,
-              volume: 0
-            });
-          }
-          setCandles(initialCandles);
-          console.log(`[DEBUG] 📊 Initialized ${initialCandles.length} historical candles`);
-
-          // Start polling CoinGecko
-          coinGeckoFallbackTimer = startCoinGeckoPricePolling(coinId, (price) => {
-            console.log(`[DEBUG] 💰 CoinGecko price update: $${price}`);
-            setCurrentPrice(price);
-
-            const currentTimestamp = Date.now();
-            const currentMinute = Math.floor(currentTimestamp / 60000) * 60000;
-
-            setCandles(prev => {
-              const lastCandle = prev[prev.length - 1];
-
-              if (lastCandle && lastCandle.time === currentMinute) {
-                const newCandles = [...prev];
-                newCandles[newCandles.length - 1] = {
-                  ...lastCandle,
-                  close: price,
-                  high: Math.max(lastCandle.high, price),
-                  low: Math.min(lastCandle.low, price),
-                };
-                return newCandles;
-              } else {
-                console.log(`[DEBUG] 🕐 New candle created at ${new Date(currentMinute).toISOString()}`);
-                return [...prev, {
-                  time: currentMinute,
-                  open: price,
-                  high: price,
-                  low: price,
-                  close: price,
-                  volume: 0
-                }].slice(-50);
-              }
-            });
-          }, 2000); // Poll every 2 seconds
-          console.log(`[DEBUG] ⏱️ CoinGecko polling started (2s interval)`);
-        } else {
-          console.error(`[DEBUG] ❌ No CoinGecko mapping for ${selectedAsset.symbol}`);
-          setIsConnected(false);
-          setStatusMessage("❌ Connection Error (No fallback available)");
-        }
-      };
-
-      ws.onerror = (e) => {
-        console.error(`[DEBUG] ⚠️ Binance WS Error:`, e);
-        console.log(`[DEBUG] wsConnected: ${wsConnected}, fallbackActivated: ${fallbackActivated}`);
-
-        // Activate fallback if not connected yet OR if connection dropped
-        if (!fallbackActivated) {
-          activateCoinGeckoFallback();
-        }
-      };
-
-      ws.onmessage = (event) => {
-        const message = JSON.parse(event.data);
-        if (message.e === 'kline') {
-          const k = message.k;
-          const candle: Candle = {
-            time: k.t,
-            open: parseFloat(k.o),
-            high: parseFloat(k.h),
-            low: parseFloat(k.l),
-            close: parseFloat(k.c),
-            volume: parseFloat(k.v),
-          };
-
+      marketDataService.connect(selectedAsset.symbol, {
+        onMessage: (candle: Candle) => {
           setCurrentPrice(candle.close);
-
           setCandles(prev => {
             const lastCandle = prev[prev.length - 1];
             if (lastCandle && lastCandle.time === candle.time) {
@@ -383,36 +279,29 @@ const App: React.FC = () => {
               newCandles[newCandles.length - 1] = candle;
               return newCandles;
             } else {
-              const newCandles = [...prev, candle];
-              return newCandles.slice(-50);
+              return [...prev, candle].slice(-50);
             }
           });
-        }
-      };
-
-      ws.onclose = () => {
-        console.log(`[DEBUG] 🔌 Binance WebSocket closed for ${selectedAsset.symbol}`);
-        // If WebSocket closes and we haven't activated fallback, try it now
-        if (!fallbackActivated && !wsConnected) {
-          console.log(`[DEBUG] 🔄 WebSocket closed before connecting, trying fallback...`);
-          activateCoinGeckoFallback();
-        } else {
+        },
+        onStatusChange: (provider, message) => {
+          console.log(`[App] Status: ${provider} - ${message}`);
+          setStatusMessage(message);
+          setActiveProvider(provider);
+          setIsConnected(true);
+        },
+        onError: (err) => {
+          console.error(`[App] MarketData Error: ${err}`);
+          setStatusMessage(`Error: ${err}`);
           setIsConnected(false);
         }
-      };
-      wsRef.current = ws;
-
-      // Store CoinGecko timer reference for cleanup
-      if (coinGeckoFallbackTimer) {
-        simRef.current = coinGeckoFallbackTimer;
-      }
+      });
     }
 
     return () => {
-      if (wsRef.current) wsRef.current.close();
+      marketDataService.disconnect();
       if (simRef.current) clearInterval(simRef.current);
     };
-  }, [selectedAsset]);
+  }, [selectedAsset, forceSimulation]);
 
   const handleAnalysis = useCallback(async (inds: TechnicalIndicators) => {
     if (candles.length === 0) return;
@@ -644,7 +533,7 @@ const App: React.FC = () => {
               </h1>
               <p className="text-[10px] md:text-xs text-slate-500 flex items-center gap-1">
                 <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
-                {selectedAsset.isSimulated || forceSimulation ? 'Simulation Stream' : 'Binance Live Stream'}
+                {selectedAsset.isSimulated || forceSimulation ? 'Simulation Stream' : `${activeProvider} Live Stream`}
               </p>
 
               <button
