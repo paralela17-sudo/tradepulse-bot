@@ -5,6 +5,7 @@ export type DataProvider = 'BINANCE' | 'BYBIT' | 'COINGECKO' | 'SIMULATION';
 
 interface ConnectionCallbacks {
     onMessage: (candle: Candle) => void;
+    onHistory?: (candles: Candle[]) => void;
     onError: (error: string) => void;
     onStatusChange: (provider: DataProvider, status: string) => void;
 }
@@ -45,10 +46,133 @@ export class MarketDataService {
         }
     }
 
+    private async fetchHistory(provider: DataProvider) {
+        if (!this.callbacks?.onHistory) return;
+
+        console.log(`[MarketData] Fetching history from ${provider} for ${this.currentSymbol}...`);
+        try {
+            let candles: Candle[] = [];
+
+            if (provider === 'BYBIT') {
+                const url = `https://api.bybit.com/v5/market/kline?category=spot&symbol=${this.currentSymbol.toUpperCase()}&interval=1&limit=50`;
+                const res = await fetch(url);
+                const json = await res.json();
+
+                if (json.retCode === 0 && json.result?.list) {
+                    candles = json.result.list.map((k: any[]) => ({
+                        time: parseInt(k[0]),
+                        open: parseFloat(k[1]),
+                        high: parseFloat(k[2]),
+                        low: parseFloat(k[3]),
+                        close: parseFloat(k[4]),
+                        volume: parseFloat(k[5])
+                    })).reverse(); // Bybit returns descending
+                }
+            } else if (provider === 'BINANCE') {
+                const url = `https://api.binance.com/api/v3/klines?symbol=${this.currentSymbol.toUpperCase()}&interval=1m&limit=50`;
+                const res = await fetch(url);
+                const json = await res.json();
+
+                if (Array.isArray(json)) {
+                    candles = json.map((k: any[]) => ({
+                        time: k[0],
+                        open: parseFloat(k[1]),
+                        high: parseFloat(k[2]),
+                        low: parseFloat(k[3]),
+                        close: parseFloat(k[4]),
+                        volume: parseFloat(k[5])
+                    }));
+                }
+            }
+
+            if (candles.length > 0) {
+                console.log(`[MarketData] Loaded ${candles.length} historical candles from ${provider}`);
+                this.callbacks.onHistory(candles);
+            }
+        } catch (e) {
+            console.error(`[MarketData] History fetch failed for ${provider}:`, e);
+        }
+    }
+
+    // --- BYBIT STRATEGY ---
+    private tryBybit() {
+        this.disconnect(); // Clear previous state
+        this.isIntentionalClose = false; // Reset intentional close
+        const bybitSymbol = this.currentSymbol.toUpperCase();
+
+        if (this.callbacks) this.callbacks.onStatusChange('BYBIT', 'Connecting to Bybit (Backup)...');
+        console.log(`[MarketData] Attempting Bybit connection for ${bybitSymbol}`);
+
+        // FETCH HISTORY FIRST
+        this.fetchHistory('BYBIT');
+
+        this.ws = new WebSocket('wss://stream.bybit.com/v5/public/spot');
+
+        this.setConnectionTimeout(7000, () => {
+            console.warn('[MarketData] Bybit timeout! Switching to Binance...');
+            if (this.ws) this.ws.close();
+            this.tryBinance();
+        });
+
+        this.ws.onopen = () => {
+            this.clearConnectionTimeout();
+            console.log('[MarketData] Bybit Connected. Subscribing...');
+            // Subscribe message
+            const subscribeMsg = {
+                "op": "subscribe",
+                "args": [`kline.1.${bybitSymbol}`]
+            };
+            this.ws?.send(JSON.stringify(subscribeMsg));
+            if (this.callbacks) this.callbacks.onStatusChange('BYBIT', 'Connected (Real-time Backup)');
+        };
+
+        this.ws.onmessage = (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+
+                // Handle subscription confirmation
+                if (msg.success) {
+                    console.log(`[MarketData] Bybit Subscription Success: ${msg.ret_msg}`);
+                    return;
+                }
+
+                // Handle Data
+                if (msg.topic && msg.topic.startsWith('kline') && msg.data && msg.data.length > 0) {
+                    const k = msg.data[0];
+                    const candle: Candle = {
+                        time: parseInt(k.start),
+                        open: parseFloat(k.open),
+                        high: parseFloat(k.high),
+                        low: parseFloat(k.low),
+                        close: parseFloat(k.close),
+                        volume: parseFloat(k.volume)
+                    };
+                    if (this.callbacks) this.callbacks.onMessage(candle);
+                }
+
+            } catch (e) {
+                console.error('[MarketData] Bybit Parse Error', e);
+            }
+        };
+
+        this.ws.onerror = (e) => {
+            console.error('[MarketData] Bybit Error', e);
+        };
+
+        this.ws.onclose = () => {
+            if (this.isIntentionalClose) return;
+            console.warn('[MarketData] Bybit Closed. Switching to Binance...');
+            this.tryBinance();
+        };
+    }
+
     // --- BINANCE STRATEGY ---
     private tryBinance() {
         if (this.callbacks) this.callbacks.onStatusChange('BINANCE', 'Connecting to Binance...');
         console.log(`[MarketData] Attempting Binance connection for ${this.currentSymbol}`);
+
+        // FETCH HISTORY FIRST
+        this.fetchHistory('BINANCE');
 
         this.ws = new WebSocket(`wss://stream.binance.com/ws/${this.currentSymbol}@kline_1m`);
         this.setConnectionTimeout(7000, () => {
@@ -95,80 +219,6 @@ export class MarketDataService {
         };
     }
 
-    // --- BYBIT STRATEGY ---
-    private tryBybit() {
-        this.disconnect(); // Clear previous state
-        this.isIntentionalClose = false; // Reset intentional close
-        const bybitSymbol = this.currentSymbol.toUpperCase();
-
-        if (this.callbacks) this.callbacks.onStatusChange('BYBIT', 'Connecting to Bybit (Backup)...');
-        console.log(`[MarketData] Attempting Bybit connection for ${bybitSymbol}`);
-
-        this.ws = new WebSocket('wss://stream.bybit.com/v5/public/spot');
-
-        this.setConnectionTimeout(7000, () => {
-            console.warn('[MarketData] Bybit timeout! Switching to Binance...');
-            if (this.ws) this.ws.close();
-            this.tryBinance();
-        });
-
-        this.ws.onopen = () => {
-            this.clearConnectionTimeout();
-            console.log('[MarketData] Bybit Connected. Subscribing...');
-            // Subscribe message
-            const subscribeMsg = {
-                "op": "subscribe",
-                "args": [`kline.1.${bybitSymbol}`]
-            };
-            this.ws?.send(JSON.stringify(subscribeMsg));
-            if (this.callbacks) this.callbacks.onStatusChange('BYBIT', 'Connected (Real-time Backup)');
-        };
-
-        this.ws.onmessage = (event) => {
-            try {
-                const msg = JSON.parse(event.data);
-
-                // Handle subscription confirmation
-                if (msg.success) {
-                    console.log(`[MarketData] Bybit Subscription Success: ${msg.ret_msg}`);
-                    return;
-                }
-
-                // Handle Heartbeat/Pong? Bybit sends auto-ping, no manual pong needed usually for public.
-
-                // Handle Data
-                if (msg.topic && msg.topic.startsWith('kline') && msg.data && msg.data.length > 0) {
-                    const k = msg.data[0]; // Bybit sends array of 1 for push
-                    // Bybit v5 spot kline format verified:
-                    // { start, end, interval, open, close, high, low, volume, turnover, confirm, timestamp }
-
-                    const candle: Candle = {
-                        time: parseInt(k.start),
-                        open: parseFloat(k.open),
-                        high: parseFloat(k.high),
-                        low: parseFloat(k.low),
-                        close: parseFloat(k.close),
-                        volume: parseFloat(k.volume)
-                    };
-                    if (this.callbacks) this.callbacks.onMessage(candle);
-                }
-
-            } catch (e) {
-                console.error('[MarketData] Bybit Parse Error', e);
-            }
-        };
-
-        this.ws.onerror = (e) => {
-            console.error('[MarketData] Bybit Error', e);
-        };
-
-        this.ws.onclose = () => {
-            if (this.isIntentionalClose) return;
-            console.warn('[MarketData] Bybit Closed. Switching to Binance...');
-            this.tryBinance();
-        };
-    }
-
     // --- COINGECKO STRATEGY ---
     private activateCoinGecko() {
         this.disconnect();
@@ -181,9 +231,6 @@ export class MarketDataService {
         }
 
         console.log(`[MarketData] Starting polling for ${coinId}`);
-
-        // Initial fetch handled inside startCoinGeckoPricePolling logic usually, 
-        // but here we just start the interval.
 
         // Fix: startCoinGeckoPricePolling returns an interval ID (NodeJS.Timeout or number), 
         // but coinGeckoCleanup expects a function () => void. 

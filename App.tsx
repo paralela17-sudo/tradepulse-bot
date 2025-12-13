@@ -23,55 +23,6 @@ const ASSETS: Asset[] = [
   { symbol: 'suiusdt', name: 'SUI', category: 'Crypto', profit: 80, isHot: true, initialPrice: 3.19, isSimulated: false },
   { symbol: 'linkusdt', name: 'LINK', category: 'Crypto', profit: 80, isHot: true, initialPrice: 20.74, isSimulated: false },
   { symbol: 'xlmusdt', name: 'Stellar', category: 'Crypto', profit: 80, isHot: true, initialPrice: 0.28, isSimulated: false },
-
-  // --- STOCKS (Simulated) ---
-  { symbol: 'AAPL_S', name: 'Apple', category: 'Stocks', profit: 98, isHot: true, initialPrice: 237.92, isSimulated: true },
-  { symbol: 'NFLX_S', name: 'Netflix', category: 'Stocks', profit: 88, isHot: true, initialPrice: 1207.78, isSimulated: true },
-  { symbol: 'META_S', name: 'Meta', category: 'Stocks', profit: 96, isHot: true, initialPrice: 780.31, isSimulated: true },
-  { symbol: 'TSLA_S', name: 'Tesla', category: 'Stocks', profit: 94, isHot: true, initialPrice: 416.81, isSimulated: true },
-  { symbol: 'MSFT_S', name: 'Microsoft', category: 'Stocks', profit: 80, isHot: true, initialPrice: 508.42, isSimulated: true },
-  { symbol: 'MCD_S', name: 'McDonalds', category: 'Stocks', profit: 86, isHot: true, initialPrice: 301.21, isSimulated: true },
-  { symbol: 'AMZN_S', name: 'Amazon', category: 'Stocks', profit: 80, isHot: true, initialPrice: 237.92, isSimulated: true },
-  { symbol: 'PYPL_S', name: 'PayPal', category: 'Stocks', profit: 80, isHot: true, initialPrice: 237.92, isSimulated: true },
-  { symbol: 'SBUX_S', name: 'Starbucks', category: 'Stocks', profit: 80, isHot: true, initialPrice: 85.69, isSimulated: true },
-  { symbol: 'NVDA_S', name: 'NVIDIA', category: 'Stocks', profit: 80, isHot: true, initialPrice: 237.92, isSimulated: true },
-  { symbol: 'DIS_S', name: 'Disney', category: 'Stocks', profit: 80, isHot: true, initialPrice: 112.99, isSimulated: true },
-  { symbol: 'INTC_S', name: 'Intel', category: 'Stocks', profit: 80, isHot: true, initialPrice: 33.27, isSimulated: true },
-  { symbol: 'V_S', name: 'VISA', category: 'Stocks', profit: 80, isHot: true, initialPrice: 336.44, isSimulated: true },
-  { symbol: 'IBM_S', name: 'IBM', category: 'Stocks', profit: 80, isHot: true, initialPrice: 282.21, isSimulated: true },
-  { symbol: 'F_S', name: 'Ford', category: 'Stocks', profit: 80, isHot: true, initialPrice: 11.57, isSimulated: true },
-  { symbol: 'KO_S', name: 'Coca-Cola', category: 'Stocks', profit: 80, isHot: true, initialPrice: 66.09, isSimulated: true },
-  { symbol: 'NKE_S', name: 'NIKE', category: 'Stocks', profit: 80, isHot: true, initialPrice: 69.74, isSimulated: true },
-  { symbol: 'MA_S', name: 'Mastercard', category: 'Stocks', profit: 80, isHot: true, initialPrice: 568.30, isSimulated: true },
-  { symbol: 'SPOT_S', name: 'Spotify', category: 'Stocks', profit: 80, isHot: true, initialPrice: 709.00, isSimulated: true },
-
-  // --- OTC (Simulated) ---
-  { symbol: 'EURUSD_OTC', name: 'EUR/USD (OTC)', category: 'OTC', profit: 92, isHot: true, initialPrice: 1.1260, isSimulated: true },
-  { symbol: 'BTC_OTC', name: 'Bitcoin (OTC)', category: 'OTC', profit: 92, isHot: true, initialPrice: 111849.60, isSimulated: true },
-  { symbol: 'LTC_OTC', name: 'Litecoin (OTC)', category: 'OTC', profit: 92, isHot: true, initialPrice: 118.01, isSimulated: true },
-  { symbol: 'AAPL_OTC', name: 'Apple (OTC)', category: 'OTC', profit: 98, isHot: true, initialPrice: 236.27, isSimulated: true },
-  { symbol: 'ADA_OTC', name: 'Cardano (OTC)', category: 'OTC', profit: 92, isHot: true, initialPrice: 0.9735, isSimulated: true },
-  { symbol: 'EURGBP_OTC', name: 'EUR/GBP (OTC)', category: 'OTC', profit: 98, isHot: true, initialPrice: 0.8531, isSimulated: true },
-  { symbol: 'AUDJPY_OTC', name: 'AUD/JPY (OTC)', category: 'OTC', profit: 92, isHot: true, initialPrice: 99.94, isSimulated: true },
-  { symbol: 'XAUUSD_OTC', name: 'XAU/USD (OTC)', category: 'OTC', profit: 92, isHot: true, initialPrice: 3661.69, isSimulated: true },
-  { symbol: 'BNB_OTC', name: 'BNB (OTC)', category: 'OTC', profit: 92, isHot: true, initialPrice: 958.30, isSimulated: true },
-  { symbol: 'NFLX_OTC', name: 'Netflix (OTC)', category: 'OTC', profit: 92, isHot: true, initialPrice: 1154.55, isSimulated: true },
-  { symbol: 'META_OTC', name: 'Meta (OTC)', category: 'OTC', profit: 92, isHot: true, initialPrice: 768.30, isSimulated: true },
-  { symbol: 'TSLA_OTC', name: 'Tesla (OTC)', category: 'OTC', profit: 92, isHot: true, initialPrice: 402.41, isSimulated: true },
-  { symbol: 'MSFT_OTC', name: 'Microsoft (OTC)', category: 'OTC', profit: 92, isHot: true, initialPrice: 530.01, isSimulated: true },
-  { symbol: 'EURJPY_OTC', name: 'EUR/JPY (OTC)', category: 'OTC', profit: 92, isHot: true, initialPrice: 165.86, isSimulated: true },
-
-  // --- FOREX (Simulated) ---
-  { symbol: 'EURUSD_F', name: 'EUR/USD', category: 'Forex', profit: 86, isHot: true, initialPrice: 1.1730, isSimulated: true },
-  { symbol: 'EURGBP_F', name: 'EUR/GBP', category: 'Forex', profit: 86, isHot: true, initialPrice: 0.8710, isSimulated: true },
-  { symbol: 'AUDJPY_F', name: 'AUD/JPY', category: 'Forex', profit: 86, isHot: true, initialPrice: 97.60, isSimulated: true },
-  { symbol: 'XAUUSD_F', name: 'XAU/USD', category: 'Forex', profit: 91, isHot: true, initialPrice: 3648.86, isSimulated: true },
-  { symbol: 'EURJPY_F', name: 'EUR/JPY', category: 'Forex', profit: 92, isHot: true, initialPrice: 171.50, isSimulated: true },
-  { symbol: 'GBPUSD_F', name: 'GBP/USD', category: 'Forex', profit: 92, isHot: true, initialPrice: 1.3467, isSimulated: true },
-  { symbol: 'AUDCAD_F', name: 'AUD/CAD', category: 'Forex', profit: 92, isHot: true, initialPrice: 0.9105, isSimulated: true },
-  { symbol: 'USDCAD_F', name: 'USD/CAD', category: 'Forex', profit: 92, isHot: true, initialPrice: 1.3821, isSimulated: true },
-  { symbol: 'NZDUSD_F', name: 'NZD/USD', category: 'Forex', profit: 96, isHot: true, initialPrice: 0.5857, isSimulated: true },
-  { symbol: 'USDJPY_F', name: 'USD/JPY', category: 'Forex', profit: 92, isHot: true, initialPrice: 148.13, isSimulated: true },
 ];
 
 const BROKERS = [
@@ -116,6 +67,7 @@ const App: React.FC = () => {
   const wsRef = useRef<WebSocket | null>(null);
   const simRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scannerTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hasInitialAnalysisPerformed = useRef(false);
 
   // Check for API Key on mount
   useEffect(() => {
@@ -204,6 +156,7 @@ const App: React.FC = () => {
     setCandles([]);
     setIsConnected(false);
     setPrediction(null);
+    hasInitialAnalysisPerformed.current = false;
 
     // Force simulation if enabled OR if asset is natively simulated
     const isSimulatedMode = forceSimulation || selectedAsset.isSimulated;
@@ -283,6 +236,17 @@ const App: React.FC = () => {
             }
           });
         },
+        onHistory: (history: Candle[]) => {
+          console.log(`[App] History received: ${history.length} candles`);
+          // Ensure it's sorted safely
+          const sortedString = [...history].sort((a, b) => a.time - b.time);
+          setCandles(sortedString);
+
+          // If we have enough history, set last price
+          if (sortedString.length > 0) {
+            setCurrentPrice(sortedString[sortedString.length - 1].close);
+          }
+        },
         onStatusChange: (provider, message) => {
           console.log(`[App] Status: ${provider} - ${message}`);
           setStatusMessage(message);
@@ -357,6 +321,15 @@ const App: React.FC = () => {
 
     // DEBUG: Log values to understand why scan might be skipping
     console.log(`[DEBUG] timeLeft: ${timeLeft}s, currentMinute: ${new Date(currentMinute).toISOString()}, lastScanned: ${lastScannedTimeRef.current ? new Date(lastScannedTimeRef.current).toISOString() : 'never'}, isAnalyzing: ${isAnalyzing}`);
+
+    // LOGICA DE ANÁLISE INSTANTÂNEA (Ao carregar histórico)
+    if (!hasInitialAnalysisPerformed.current && candles.length >= 30 && !isAnalyzing) {
+      console.log(`[AUTO-SCAN] 🚀 Disparo INICIAL (Histórico carregado)`);
+      hasInitialAnalysisPerformed.current = true;
+      lastScannedTimeRef.current = currentMinute;
+      handleAnalysis(currentIndicators);
+      return;
+    }
 
     if (timeLeft <= 60 && timeLeft >= 30 && lastScannedTimeRef.current !== currentMinute && !isAnalyzing) {
       console.log(`[AUTO-SCAN] 🎯 Triggering scan at ${timeLeft}s for candle ${new Date(currentMinute).toISOString()}`);
@@ -597,7 +570,7 @@ const App: React.FC = () => {
             </div>
 
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin -mx-4 px-4 md:mx-0 md:px-0">
-              {['Crypto', 'OTC', 'Stocks', 'Forex', 'Commodities'].map(cat => (
+              {['Crypto'].map(cat => (
                 <div key={cat} className="flex-shrink-0">
                   <span className="text-xs font-bold text-slate-500 uppercase px-2 mb-1 block">{cat}</span>
                   <div className="flex gap-2">

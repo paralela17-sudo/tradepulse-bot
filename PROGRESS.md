@@ -160,7 +160,8 @@ Nenhum bug crítico conhecido no momento.
 ### Estrutura de Dados
 - WebSocket Binance: Dados em tempo real para crypto
 - CoinGecko API: Fallback quando Binance falha (polling 2s)
-- Simulação: Para ativos OTC/Stocks/Forex
+- WebSocket Binance: Dados em tempo real para crypto
+- CoinGecko API: Fallback quando Binance falha (polling 2s)
 
 ---
 
@@ -176,7 +177,7 @@ Nenhum bug crítico conhecido no momento.
 
 - **Total de Arquivos**: 22 (excluindo node_modules)
 - **Linhas de Código** (estimado): ~3.000
-- **Ativos Suportados**: 50+ (Crypto, OTC, Stocks, Forex)
+- **Ativos Suportados**: 12 (Top Crypto)
 - **Indicadores Técnicos**: 3 (RSI, MACD, SMA)
 
 ---
