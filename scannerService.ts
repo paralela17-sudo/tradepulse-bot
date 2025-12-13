@@ -8,28 +8,35 @@ interface ScanResult {
     price: number;
 }
 
-// Simular dados de candles para um ativo
-const generateSimulatedCandles = (asset: Asset, count: number = 50): Candle[] => {
-    const candles: Candle[] = [];
-    let price = asset.initialPrice;
-    const volatility = price * 0.0005;
-    const now = Date.now();
+// Fetch Real Candles from Binance
+const fetchBinanceCandles = async (symbol: string): Promise<Candle[]> => {
+    try {
+        const url = `https://api.binance.com/api/v3/klines?symbol=${symbol.toUpperCase()}&interval=1m&limit=50`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout per asset
 
-    for (let i = count; i > 0; i--) {
-        const change = (Math.random() - 0.5) * volatility * 5;
-        price += change;
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
 
-        candles.push({
-            time: now - (i * 60000),
-            open: price,
-            high: price * 1.001,
-            low: price * 0.999,
-            close: price,
-            volume: Math.random() * 1000
-        });
+        if (!res.ok) throw new Error(`Binance API Error: ${res.status}`);
+
+        const json = await res.json();
+
+        if (Array.isArray(json)) {
+            return json.map((k: any[]) => ({
+                time: k[0],
+                open: parseFloat(k[1]),
+                high: parseFloat(k[2]),
+                low: parseFloat(k[3]),
+                close: parseFloat(k[4]),
+                volume: parseFloat(k[5])
+            }));
+        }
+        return [];
+    } catch (error) {
+        console.warn(`[SCANNER] Failed to fetch data for ${symbol}:`, error);
+        return [];
     }
-
-    return candles;
 };
 
 // Lógica local de predição (mesma do geminiService.ts)
@@ -61,9 +68,11 @@ const calculateLocalPrediction = (indicators: TechnicalIndicators): PredictionRe
         rationale = "Trend: Bearish momentum continuation";
     }
     else {
-        prob = 10;
+        // Probabilidade dinâmica baseada na força da tendência para evitar valores fixos
+        const trendStrength = Math.abs(macd.histogram) * 100; // Ex: 0.0005 -> 0.05
+        prob = Math.min(45 + trendStrength, 60); // Base 45%, max 60% se neutro
         signal = SignalType.WAIT;
-        rationale = "Market noise detected. No statistical edge > 90%";
+        rationale = "Market noise detected. No statistical edge > 80%";
     }
 
     return {
@@ -74,16 +83,20 @@ const calculateLocalPrediction = (indicators: TechnicalIndicators): PredictionRe
     };
 };
 
-// Escanear um único ativo
+// Escanear um único ativo usando DADOS REAIS
 const scanSingleAsset = async (asset: Asset): Promise<ScanResult> => {
     try {
-        // Gerar candles simulados
-        const candles = generateSimulatedCandles(asset);
+        // Fetch REAL data
+        const candles = await fetchBinanceCandles(asset.symbol);
 
-        // Calcular indicadores
+        if (candles.length < 30) {
+            throw new Error("Insufficient data");
+        }
+
+        // Calcular indicadores reais
         const indicators = analyzeMarket(candles);
 
-        // Calcular predição
+        // Calcular predição baseada em dados reais
         const prediction = calculateLocalPrediction(indicators);
 
         return {
@@ -93,18 +106,17 @@ const scanSingleAsset = async (asset: Asset): Promise<ScanResult> => {
             price: candles[candles.length - 1].close
         };
     } catch (error) {
-        console.error(`Error scanning ${asset.symbol}:`, error);
-        // Retornar resultado padrão em caso de erro
+        // Fail silently or showing error state, but DO NOT SIMULATE
         return {
             asset,
             prediction: {
                 probability: 0,
                 signal: SignalType.WAIT,
-                rationale: "Error analyzing",
+                rationale: "Data Unavailable",
                 timestamp: Date.now()
             },
             indicators: {
-                rsi: 50,
+                rsi: 0,
                 macd: { macdLine: 0, signalLine: 0, histogram: 0 },
                 sma: 0
             },
@@ -113,14 +125,14 @@ const scanSingleAsset = async (asset: Asset): Promise<ScanResult> => {
     }
 };
 
-// Escanear todos os ativos - AGORA RETORNA TODOS (não filtra por ≥90%)
+// Escanear todos os ativos
 export const scanAllAssets = async (assets: Asset[]): Promise<ScanResult[]> => {
-    console.log(`[SCANNER] 🔍 Scanning ${assets.length} assets...`);
+    console.log(`[SCANNER] 🔍 Scanning ${assets.length} assets (REAL DATA)...`);
 
     const results: ScanResult[] = [];
 
-    // Escanear em lotes de 10 para não sobrecarregar
-    const batchSize = 10;
+    // Escanear em lotes menores para evitar rate limit da Binance (IP weight)
+    const batchSize = 5;
     for (let i = 0; i < assets.length; i += batchSize) {
         const batch = assets.slice(i, i + batchSize);
         const batchResults = await Promise.all(
@@ -129,16 +141,17 @@ export const scanAllAssets = async (assets: Asset[]): Promise<ScanResult[]> => {
 
         results.push(...batchResults);
 
-        // Pequeno delay entre lotes para não travar UI
+        // Delay respeitoso para API pública (500ms)
         if (i + batchSize < assets.length) {
-            await new Promise(resolve => setTimeout(resolve, 50));
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
     }
 
     console.log(`[SCANNER] ✅ Scanned ${results.length} assets`);
-    console.log(`[SCANNER] 📊 Found ${results.filter(r => r.prediction.probability >= 80).length} opportunities (≥80%)`);
-    console.log(`[SCANNER] 🔥 Found ${results.filter(r => r.prediction.probability >= 90).length} HIGH opportunities (≥90%)`);
+
+    // Filtro resultados válidos (prob > 0)
+    const validResults = results.filter(r => r.prediction.probability > 0);
 
     // Ordenar por probabilidade (maior primeiro)
-    return results.sort((a, b) => b.prediction.probability - a.prediction.probability);
+    return validResults.sort((a, b) => b.prediction.probability - a.prediction.probability);
 };
