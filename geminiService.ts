@@ -35,53 +35,7 @@ const getAiClient = () => {
   return null;
 };
 
-// --- LOCAL PYTHON LOGIC EMULATION (Fallback Rigoroso) ---
-// Simula exatamente o que o script Python faria se a API falhar
-export const calculateLocalPrediction = (indicators: TechnicalIndicators, errorContext?: string): PredictionResult => {
-  const { rsi, macd } = indicators;
-  let signal = SignalType.WAIT;
-  let prob = 0;
-  let rationale = "Calculating algo telemetry...";
-
-  // REGRAS ESTRITAS DO BOT PYTHON (SNIPER)
-  // 1. Condição de Compra Sniper: RSI abaixo de 15 (Sobrevenda Extrema) + MACD Histogram virando positivo
-  if (rsi < 15 && macd.histogram > 0) {
-    signal = SignalType.BUY;
-    prob = 96;
-    rationale = `ALGO: CRITICAL OVERSOLD (RSI ${rsi.toFixed(2)}) + BULLISH DIVERGENCE. EXECUTE IMMEDIATELY.`;
-  }
-  // 2. Condição de Venda Sniper: RSI acima de 85 (Sobrecompra Extrema) + MACD Histogram virando negativo
-  else if (rsi > 85 && macd.histogram < 0) {
-    signal = SignalType.SELL;
-    prob = 96;
-    rationale = `ALGO: CRITICAL OVERBOUGHT (RSI ${rsi.toFixed(2)}) + BEARISH DIVERGENCE. EXECUTE IMMEDIATELY.`;
-  }
-  // 3. Estratégia de Tendência (Menor Probabilidade, mas válida)
-  else if (rsi > 55 && rsi < 75 && macd.histogram > 0 && macd.macdLine > macd.signalLine) {
-    signal = SignalType.BUY;
-    prob = 82;
-    rationale = "TREND: Positive momentum structure confirmed. Continuation likely.";
-  }
-  else if (rsi < 45 && rsi > 25 && macd.histogram < 0 && macd.macdLine < macd.signalLine) {
-    signal = SignalType.SELL;
-    prob = 82;
-    rationale = "TREND: Negative momentum structure confirmed. Continuation likely.";
-  }
-  else {
-    prob = 10;
-    signal = SignalType.WAIT;
-    rationale = "FILTER: Market noise detected. No statistical edge found > 90%.";
-  }
-
-  const prefix = errorContext ? `[${errorContext} MODE] ` : "[LOCAL CORE] ";
-
-  return {
-    probability: Math.floor(prob),
-    signal,
-    rationale: prefix + rationale,
-    timestamp: Date.now()
-  };
-};
+// --- REMOVED LOCAL LOGIC AS PER USER REQUEST (NO FALLBACK) ---
 
 export const initializeGemini = () => {
   // Initialization is handled dynamically
@@ -101,8 +55,13 @@ export const getGeminiPrediction = async (
   console.log(`[GEMINI] Client check: ${genAI ? 'KEY_PRESENT' : 'NO_KEY'}`);
 
   if (!genAI) {
-    if (onStream) onStream("AI Client not configured. Using local fallback...");
-    return calculateLocalPrediction(indicators, "OFFLINE");
+    if (onStream) onStream("AI Configuration Missing (API Key).");
+    return {
+      probability: 0,
+      signal: SignalType.WAIT,
+      rationale: "AI KEY MISSING. Please configure Settings.",
+      timestamp: Date.now()
+    };
   }
 
   // --- CACHE CHECK ---
@@ -194,12 +153,20 @@ export const getGeminiPrediction = async (
       errorType = "INVALID KEY";
     } else if (errorMsg.includes("TIMEOUT")) {
       errorType = "SLOW NETWORK";
+    } else if (errorMsg.includes("Error fetching") || errorMsg.includes("NetworkError")) {
+      errorType = "NETWORK BLOCKED (ADBLOCK?)";
     } else {
-      // Shorten generic error for UI
       errorType = "API: " + errorMsg.substring(0, 50);
     }
 
-    if (onStream) onStream(`⚠ Network/API Error. Using Local Analysis...`);
-    return calculateLocalPrediction(indicators, `OFFLINE FALLBACK (${errorType})`);
+    if (onStream) onStream(`⚠ ${errorType}. Analysis Aborted.`);
+
+    // STRICT: Return NO prediction on error. No local fallback.
+    return {
+      probability: 0,
+      signal: SignalType.WAIT,
+      rationale: `CONNECTION ERROR: ${errorType}. Waiting for retry...`,
+      timestamp: Date.now()
+    };
   }
 };
