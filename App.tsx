@@ -3,7 +3,7 @@ import { Activity, AlertTriangle, Play, Pause, Lock, RefreshCw, TrendingUp, Tren
 import { Chart } from './Chart';
 import { Candle, TechnicalIndicators, PredictionResult, SignalType, Asset } from './types';
 import { analyzeMarket } from './indicators';
-import { getGeminiPrediction, initializeGemini, saveApiKey, getStoredApiKey, removeApiKey, calculateLocalPrediction } from './geminiService';
+import { getGeminiPrediction, initializeGemini, saveApiKey, getStoredApiKey, removeApiKey } from './geminiService';
 import { marketDataService, DataProvider } from './marketDataService';
 import { OpportunityPanel } from './OpportunityPanel';
 import { scanAllAssets } from './scannerService';
@@ -295,10 +295,14 @@ const App: React.FC = () => {
       console.error("Analysis Failed:", error);
       setStatusMessage("⚠ Using Hard Fallback (Connection Issue)");
 
-      // HARD LOCAL FALLBACK: If API fails, calculate locally immediately
-      // This ensures we ALWAYS have a result and never hang.
-      const fallbackResult = calculateLocalPrediction(inds, "HARD FALLBACK");
-      setPrediction(fallbackResult);
+      // HARD LOCAL FALLBACK REMOVED.
+      // STRICT AI DEPENDENCY: If API fails, we show an error.
+      setPrediction({
+        probability: 0,
+        signal: SignalType.WAIT,
+        rationale: "CONNECTION FAILURE: " + (error.message || "Unknown Network Error"),
+        timestamp: Date.now()
+      });
 
     } finally {
       setIsAnalyzing(false);
@@ -419,6 +423,24 @@ const App: React.FC = () => {
               <p className="text-xs text-slate-500 mt-2">
                 Your key is stored locally in your browser. It is never sent to our servers.
               </p>
+            </div>
+
+            <div className="mb-6">
+              <button
+                onClick={async () => {
+                  // Dynamic import to avoid circular dependencies if any, though likely safe
+                  const { testGeminiConnection } = await import('./geminiService');
+                  const btn = document.getElementById('test-btn');
+                  if (btn) btn.innerText = "Testing...";
+                  const result = await testGeminiConnection(apiKey);
+                  alert(result.success ? "✅ SUCCESS: " + result.message : "❌ FAILED: " + result.message);
+                  if (btn) btn.innerText = "🔍 Test Connection";
+                }}
+                id="test-btn"
+                className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-600 text-cyan-400 py-2 rounded-lg transition-all text-sm font-mono flex items-center justify-center gap-2"
+              >
+                🔍 Test Connection (Diagnostics)
+              </button>
             </div>
 
             <div className="flex gap-3">

@@ -109,6 +109,7 @@
 - ✅ Removidos ativos simulados (Forex, Stocks, OTC)
 - ✅ Implementado Scanner com prioridade Bybit -> Fallback Binance (100% real)
 - ✅ Removido Fallback Local: Se Gemini falhar, exibe erro (sem predição local)
+- ✅ Adicionada Ferramenta de Diagnóstico: Botão "Test Connection" no modal de Configurações
 - ✅ Deploy realizado para GitHub/Vercel
 
 **Arquivos Criados/Modificados**:

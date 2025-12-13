@@ -170,3 +170,22 @@ export const getGeminiPrediction = async (
     };
   }
 };
+
+// --- DIAGNOSTIC TOOL ---
+export const testGeminiConnection = async (apiKey: string): Promise<{ success: boolean; message: string }> => {
+  try {
+    if (!apiKey) return { success: false, message: "No API Key provided" };
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
+
+    // Simple fast prompt
+    const result = await model.generateContent("Test. Reply 'OK'.");
+    const response = await result.response;
+    const text = response.text();
+
+    return { success: true, message: `Connected! Response: ${text.substring(0, 50)}` };
+  } catch (error: any) {
+    return { success: false, message: error.toString() };
+  }
+};
