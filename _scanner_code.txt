@@ -1,0 +1,38 @@
+// Adicionar após o useEffect de initializeGemini (linha 159)
+
+  // Scanner multi-ativos
+  const runScanner = useCallback(async () => {
+    console.log('[SCANNER] Starting scan...');
+    setIsScanning(true);
+    
+    try {
+      const results = await scanAllAssets(ASSETS);
+      setOpportunities(results);
+      setLastScanTime(Date.now());
+      console.log(`[SCANNER] Found ${results.length} opportunities`);
+    } catch (error) {
+      console.error('[SCANNER] Error:', error);
+    } finally {
+      setIsScanning(false);
+    }
+  }, []);
+
+  // Iniciar scanner automático
+  useEffect(() => {
+    // Scan inicial após 5 segundos
+    const initialScanTimer = setTimeout(() => {
+      runScanner();
+    }, 5000);
+
+    // Scan periódico a cada 60 segundos
+    scannerTimerRef.current = setInterval(() => {
+      runScanner();
+    }, 60000);
+
+    return () => {
+      clearTimeout(initialScanTimer);
+      if (scannerTimerRef.current) {
+        clearInterval(scannerTimerRef.current);
+      }
+    };
+  }, [runScanner]);
