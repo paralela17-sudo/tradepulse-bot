@@ -425,17 +425,28 @@ const App: React.FC = () => {
       const lastPrice = candles[candles.length - 1].close;
       setStatusMessage("Analyzing Market Data...");
 
-      const result = await getGeminiPrediction(selectedAsset.name, lastPrice, inds);
+      // Create a safety timeout promise
+      const timeoutPromise = new Promise<PredictionResult>((_, reject) => {
+        setTimeout(() => reject(new Error("Application Timeout (10s)")), 10000);
+      });
+
+      // Race the actual API call against the timeout
+      const result = await Promise.race([
+        getGeminiPrediction(selectedAsset.name, lastPrice, inds),
+        timeoutPromise
+      ]);
 
       setStatusMessage("Processing Result...");
       setPrediction(result);
     } catch (error: any) {
       console.error("Analysis Failed:", error);
       setStatusMessage(`Error: ${error.message || "Unknown Failure"}`);
+
+      // Fallback to local prediction logic if everything fails
       setPrediction({
         probability: 0,
         signal: SignalType.WAIT,
-        rationale: `System Error: ${error.message}. retrying...`,
+        rationale: `System Alert: Analysis timed out or failed (${error.message}). Retrying...`,
         timestamp: Date.now()
       });
     } finally {
