@@ -109,7 +109,8 @@ export const getGeminiPrediction = async (
     if (onStream) onStream("Scanning Market (Timeout: 8s)...");
 
     // Race Condition: API Call vs Timeout
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
+    // Updated to standard alias to prevent 404s
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     console.log("[GEMINI] Model initialized, sending prompt...");
 
     const apiCall = model.generateContent(prompt);
@@ -177,7 +178,8 @@ export const testGeminiConnection = async (apiKey: string): Promise<{ success: b
     if (!apiKey) return { success: false, message: "No API Key provided" };
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
+    // Updated to standard alias to prevent 404s
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     // Simple fast prompt
     const result = await model.generateContent("Test. Reply 'OK'.");
