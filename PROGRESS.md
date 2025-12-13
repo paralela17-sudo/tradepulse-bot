@@ -107,7 +107,7 @@
 **Trabalho Realizado**:
 - ✅ Implementado "Análise Instantânea" no App.tsx
 - ✅ Removidos ativos simulados (Forex, Stocks, OTC)
-- ✅ Implementado Scanner com dados reais da Binance (substituindo simulação)
+- ✅ Implementado Scanner com prioridade Bybit -> Fallback Binance (100% real)
 - ✅ Deploy realizado para GitHub/Vercel
 
 **Arquivos Criados/Modificados**:

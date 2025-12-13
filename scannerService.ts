@@ -8,12 +8,43 @@ interface ScanResult {
     price: number;
 }
 
-// Fetch Real Candles from Binance
+// Fetch Real Candles from Bybit (Primary)
+const fetchBybitCandles = async (symbol: string): Promise<Candle[]> => {
+    try {
+        // Bybit V5 API
+        const url = `https://api.bybit.com/v5/market/kline?category=spot&symbol=${symbol.toUpperCase()}&interval=1&limit=50`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (!res.ok) throw new Error(`Bybit API Error: ${res.status}`);
+
+        const json = await res.json();
+
+        if (json.retCode === 0 && json.result?.list) {
+            return json.result.list.map((k: any[]) => ({
+                time: parseInt(k[0]),
+                open: parseFloat(k[1]),
+                high: parseFloat(k[2]),
+                low: parseFloat(k[3]),
+                close: parseFloat(k[4]),
+                volume: parseFloat(k[5])
+            })).reverse(); // Bybit returns descending (newest first), we need ascending
+        }
+        return [];
+    } catch (error) {
+        throw error;
+    }
+};
+
+// Fetch Real Candles from Binance (Fallback)
 const fetchBinanceCandles = async (symbol: string): Promise<Candle[]> => {
     try {
         const url = `https://api.binance.com/api/v3/klines?symbol=${symbol.toUpperCase()}&interval=1m&limit=50`;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout per asset
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
 
         const res = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
@@ -34,8 +65,8 @@ const fetchBinanceCandles = async (symbol: string): Promise<Candle[]> => {
         }
         return [];
     } catch (error) {
-        console.warn(`[SCANNER] Failed to fetch data for ${symbol}:`, error);
-        return [];
+        console.warn(`[SCANNER] Binance failed for ${symbol}:`, error);
+        throw error;
     }
 };
 
@@ -83,36 +114,45 @@ const calculateLocalPrediction = (indicators: TechnicalIndicators): PredictionRe
     };
 };
 
-// Escanear um único ativo usando DADOS REAIS
+// Escanear um único ativo usando DADOS REAIS (Bybit -> fallback Binance)
 const scanSingleAsset = async (asset: Asset): Promise<ScanResult> => {
+    let candles: Candle[] = [];
+
+    // 1. Tentar Bybit (Prioridade)
     try {
-        // Fetch REAL data
-        const candles = await fetchBinanceCandles(asset.symbol);
-
-        if (candles.length < 30) {
-            throw new Error("Insufficient data");
+        candles = await fetchBybitCandles(asset.symbol);
+    } catch (bybitError) {
+        // 2. Se falhar, tentar Binance (Backup)
+        try {
+            candles = await fetchBinanceCandles(asset.symbol);
+        } catch (binanceError) {
+            // 3. Se ambos falharem, retornar Unavailable (SEM SIMULAÇÃO)
+            return {
+                asset,
+                prediction: {
+                    probability: 0,
+                    signal: SignalType.WAIT,
+                    rationale: "Data Unavailable (Bybit/Binance failed)",
+                    timestamp: Date.now()
+                },
+                indicators: {
+                    rsi: 0,
+                    macd: { macdLine: 0, signalLine: 0, histogram: 0 },
+                    sma: 0
+                },
+                price: asset.initialPrice
+            };
         }
+    }
 
-        // Calcular indicadores reais
-        const indicators = analyzeMarket(candles);
-
-        // Calcular predição baseada em dados reais
-        const prediction = calculateLocalPrediction(indicators);
-
-        return {
-            asset,
-            prediction,
-            indicators,
-            price: candles[candles.length - 1].close
-        };
-    } catch (error) {
-        // Fail silently or showing error state, but DO NOT SIMULATE
+    if (candles.length < 30) {
+        // Fallback return if data is insufficient even if call succeeded
         return {
             asset,
             prediction: {
                 probability: 0,
                 signal: SignalType.WAIT,
-                rationale: "Data Unavailable",
+                rationale: "Insufficient Data",
                 timestamp: Date.now()
             },
             indicators: {
@@ -123,15 +163,28 @@ const scanSingleAsset = async (asset: Asset): Promise<ScanResult> => {
             price: asset.initialPrice
         };
     }
+
+    // Calcular indicadores reais
+    const indicators = analyzeMarket(candles);
+
+    // Calcular predição baseada em dados reais
+    const prediction = calculateLocalPrediction(indicators);
+
+    return {
+        asset,
+        prediction,
+        indicators,
+        price: candles[candles.length - 1].close
+    };
 };
 
 // Escanear todos os ativos
 export const scanAllAssets = async (assets: Asset[]): Promise<ScanResult[]> => {
-    console.log(`[SCANNER] 🔍 Scanning ${assets.length} assets (REAL DATA)...`);
+    console.log(`[SCANNER] 🔍 Scanning ${assets.length} assets (Primary: Bybit, Backup: Binance)...`);
 
     const results: ScanResult[] = [];
 
-    // Escanear em lotes menores para evitar rate limit da Binance (IP weight)
+    // Escanear em lotes menores para evitar rate limit
     const batchSize = 5;
     for (let i = 0; i < assets.length; i += batchSize) {
         const batch = assets.slice(i, i + batchSize);
@@ -141,7 +194,7 @@ export const scanAllAssets = async (assets: Asset[]): Promise<ScanResult[]> => {
 
         results.push(...batchResults);
 
-        // Delay respeitoso para API pública (500ms)
+        // Delay respeitoso para APIs públicas
         if (i + batchSize < assets.length) {
             await new Promise(resolve => setTimeout(resolve, 500));
         }
