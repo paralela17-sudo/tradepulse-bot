@@ -3,7 +3,7 @@ import { Activity, AlertTriangle, Play, Pause, Lock, RefreshCw, TrendingUp, Tren
 import { Chart } from './Chart';
 import { Candle, TechnicalIndicators, PredictionResult, SignalType, Asset } from './types';
 import { analyzeMarket } from './indicators';
-import { getGeminiPrediction, initializeGemini, saveApiKey, getStoredApiKey, removeApiKey } from './geminiService';
+import { getGeminiPrediction, initializeGemini, saveApiKey, getStoredApiKey, removeApiKey, calculateLocalPrediction } from './geminiService';
 import { marketDataService, DataProvider } from './marketDataService';
 import { OpportunityPanel } from './OpportunityPanel';
 import { scanAllAssets } from './scannerService';
@@ -316,7 +316,7 @@ const App: React.FC = () => {
 
       // Create a safety timeout promise
       const timeoutPromise = new Promise<PredictionResult>((_, reject) => {
-        setTimeout(() => reject(new Error("Application Timeout (10s)")), 10000);
+        setTimeout(() => reject(new Error("Timeout (5s)")), 5000);
       });
 
       // Race the actual API call against the timeout
@@ -329,15 +329,13 @@ const App: React.FC = () => {
       setPrediction(result);
     } catch (error: any) {
       console.error("Analysis Failed:", error);
-      setStatusMessage(`Error: ${error.message || "Unknown Failure"}`);
+      setStatusMessage("⚠ Using Hard Fallback (Connection Issue)");
 
-      // Fallback to local prediction logic if everything fails
-      setPrediction({
-        probability: 0,
-        signal: SignalType.WAIT,
-        rationale: `System Alert: Analysis timed out or failed (${error.message}). Retrying...`,
-        timestamp: Date.now()
-      });
+      // HARD LOCAL FALLBACK: If API fails, calculate locally immediately
+      // This ensures we ALWAYS have a result and never hang.
+      const fallbackResult = calculateLocalPrediction(inds, "HARD FALLBACK");
+      setPrediction(fallbackResult);
+
     } finally {
       setIsAnalyzing(false);
     }

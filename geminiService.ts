@@ -37,7 +37,7 @@ const getAiClient = () => {
 
 // --- LOCAL PYTHON LOGIC EMULATION (Fallback Rigoroso) ---
 // Simula exatamente o que o script Python faria se a API falhar
-const calculateLocalPrediction = (indicators: TechnicalIndicators, errorContext?: string): PredictionResult => {
+export const calculateLocalPrediction = (indicators: TechnicalIndicators, errorContext?: string): PredictionResult => {
   const { rsi, macd } = indicators;
   let signal = SignalType.WAIT;
   let prob = 0;

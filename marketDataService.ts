@@ -25,8 +25,8 @@ export class MarketDataService {
         this.callbacks = callbacks;
         this.isIntentionalClose = false;
 
-        // Start with Binance
-        this.tryBinance();
+        // Start with Bybit (Prioritized per user request)
+        this.tryBybit();
     }
 
     public disconnect() {
@@ -52,9 +52,9 @@ export class MarketDataService {
 
         this.ws = new WebSocket(`wss://stream.binance.com/ws/${this.currentSymbol}@kline_1m`);
         this.setConnectionTimeout(7000, () => {
-            console.warn('[MarketData] Binance timeout! Switching to Bybit...');
+            console.warn('[MarketData] Binance timeout! Switching to CoinGecko...');
             if (this.ws) this.ws.close(); // Force close to trigger logic
-            this.tryBybit();
+            this.activateCoinGecko();
         });
 
         this.ws.onopen = () => {
@@ -90,8 +90,8 @@ export class MarketDataService {
 
         this.ws.onclose = () => {
             if (this.isIntentionalClose) return;
-            console.warn('[MarketData] Binance Closed. Switching to Bybit...');
-            this.tryBybit();
+            console.warn('[MarketData] Binance Closed. Switching to CoinGecko...');
+            this.activateCoinGecko();
         };
     }
 
@@ -107,9 +107,9 @@ export class MarketDataService {
         this.ws = new WebSocket('wss://stream.bybit.com/v5/public/spot');
 
         this.setConnectionTimeout(7000, () => {
-            console.warn('[MarketData] Bybit timeout! Switching to CoinGecko...');
+            console.warn('[MarketData] Bybit timeout! Switching to Binance...');
             if (this.ws) this.ws.close();
-            this.activateCoinGecko();
+            this.tryBinance();
         });
 
         this.ws.onopen = () => {
@@ -137,10 +137,10 @@ export class MarketDataService {
                 // Handle Heartbeat/Pong? Bybit sends auto-ping, no manual pong needed usually for public.
 
                 // Handle Data
-                if (msg.topic && msg.topic.startsWith('kline') && msg.data) {
-                    const k = msg.data[0]; // Bybit sends array
-                    // Bybit Format: [start, open, high, low, close, volume, turnvoer]
-                    // But v5 spot kline data object: { start, end, interval, open, close, high, low, volume, turnover }
+                if (msg.topic && msg.topic.startsWith('kline') && msg.data && msg.data.length > 0) {
+                    const k = msg.data[0]; // Bybit sends array of 1 for push
+                    // Bybit v5 spot kline format verified:
+                    // { start, end, interval, open, close, high, low, volume, turnover, confirm, timestamp }
 
                     const candle: Candle = {
                         time: parseInt(k.start),
@@ -164,8 +164,8 @@ export class MarketDataService {
 
         this.ws.onclose = () => {
             if (this.isIntentionalClose) return;
-            console.warn('[MarketData] Bybit Closed. Switching to CoinGecko...');
-            this.activateCoinGecko();
+            console.warn('[MarketData] Bybit Closed. Switching to Binance...');
+            this.tryBinance();
         };
     }
 
