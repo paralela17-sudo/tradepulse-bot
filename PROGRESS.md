@@ -110,7 +110,8 @@
 - ✅ Implementado Scanner com prioridade Bybit -> Fallback Binance (100% real)
 - ✅ Removido Fallback Local: Se Gemini falhar, exibe erro (sem predição local)
 - ✅ Adicionada Ferramenta de Diagnóstico: Botão "Test Connection" no modal de Configurações
-- ✅ Corrigido ID do Modelo Gemini: Alterado de 'gemini-1.5-flash-001' para 'gemini-1.5-flash' (evita erro 404)
+- ✅ Corrigido ID do Modelo Gemini: Alterado de 'gemini-1.5-flash' para 'gemini-pro' (1.5 Flash indisponível no endpoint)
+- ✅ Atualizado UI para refletir "Gemini Pro"
 - ✅ Deploy realizado para GitHub/Vercel
 
 **Arquivos Criados/Modificados**:
