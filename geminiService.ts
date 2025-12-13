@@ -98,6 +98,7 @@ export const getGeminiPrediction = async (
   onStream?: (chunk: string) => void
 ): Promise<PredictionResult> => {
   const genAI = getAiClient();
+  console.log(`[GEMINI] Client check: ${genAI ? 'KEY_PRESENT' : 'NO_KEY'}`);
 
   if (!genAI) {
     if (onStream) onStream("AI Client not configured. Using local fallback...");
@@ -145,10 +146,12 @@ export const getGeminiPrediction = async (
       { "probability": number, "signal": "BUY"|"SELL"|"WAIT", "rationale": "string" }
     `;
 
+    console.log("[GEMINI] 🚀 Starting prediction request...");
     if (onStream) onStream("Scanning Market (Timeout: 8s)...");
 
     // Race Condition: API Call vs Timeout
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
+    console.log("[GEMINI] Model initialized, sending prompt...");
 
     const apiCall = model.generateContent(prompt);
 
@@ -156,9 +159,13 @@ export const getGeminiPrediction = async (
       setTimeout(() => reject(new Error("TIMEOUT")), 8000); // 8s timeout
     });
 
+    console.log("[GEMINI] Awaiting API response or timeout...");
     const resultWrap = await Promise.race([apiCall, timeoutPromise]);
+    console.log("[GEMINI] Race finished. Resolving response text...");
+
     const response = await resultWrap.response;
     const text = response.text();
+    console.log("[GEMINI] Raw response received:", text.substring(0, 50) + "...");
 
     // Clean markdown if present
     const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
